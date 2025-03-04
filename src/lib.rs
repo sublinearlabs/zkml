@@ -5,37 +5,36 @@ use expander_compiler::field::BN254;
 //  might have to look into using multiple limbs of m31 or reducing the
 //  fixed point space to fit into 15 / 16 bits
 
-// TODO: document N
-struct Quantizer<const N: u32> {}
+/// N represents the number of fractional bits for the fixed point representation
+struct Quantizer<const N: u8> {}
 
-impl<const N: u32> Quantizer<N> {
-    // TODO: documentation / replace BN254
+impl<const N: u8> Quantizer<N> {
+    /// Converts an f32 value into signed fixed point representation and represent that
+    /// value in a field
     fn quantize(&self, value: f32) -> BN254 {
         let mut scaled_float = value * (1 << N) as f32;
+
+        // to minimize quantization error from granularity g to g/2
+        // we add \pm 0.5 to bias value to the closest fixed point rep (rounding)
+        // as opposed to just direct truncation
         if value >= 0. {
             scaled_float += 0.5
         } else {
             scaled_float -= 0.5
         }
+
+        // first convert to i32 to handle sign extension then convert to u32
+        // bit pattern is preserved see `test_i32_as_u32_same_bit_pattern`
         let fixed_rep = (scaled_float as i32) as u32;
+
         BN254::from(fixed_rep)
     }
 
-    // TODO: add documentation
+    /// Converts a field representation of a fixed point value to the equivalent f32 value
     fn dequantize(&self, value: &BN254) -> f32 {
         let mut lower_u32 = [0; 4];
         lower_u32.copy_from_slice(&value.to_bytes()[0..4]);
         u32::from_le_bytes(lower_u32) as f32 / (1 << N) as f32
-    }
-}
-
-// TODO: add documentation
-fn generate_granularity_steps(fractional_bit_count: u32) {
-    let granularity = 1.0 / (1 << fractional_bit_count) as f32;
-    let mut curr = 0.0;
-    while curr != 1.0 {
-        println!("{}", curr);
-        curr += granularity
     }
 }
 
