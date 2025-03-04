@@ -1,5 +1,6 @@
 use expander_compiler::field::FieldArith;
 use expander_compiler::field::BN254;
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 
 // TODO: forced to use BN254 for now, goldilocks would have been preferred
 //  might have to look into using multiple limbs of m31 or reducing the
@@ -36,6 +37,24 @@ impl<const N: u8> Quantizer<N> {
         lower_u32.copy_from_slice(&value.to_bytes()[0..4]);
         u32::from_le_bytes(lower_u32) as f32 / (1 << N) as f32
     }
+}
+
+// TODO: add documentation
+fn add_q<C: Config, B: RootAPI<C>>(api: &mut B, a: Variable, b: Variable) -> Variable {
+    api.add(a, b)
+}
+
+// TODO: add documentation
+fn mul_q<C: Config, B: RootAPI<C>>(
+    api: &mut B,
+    a: Variable,
+    b: Variable,
+    scale_inv: Variable,
+) -> Variable {
+    // we need first multiply then rescale
+    let accumulated_mul = api.mul(a, b);
+    // TODO: what is checked??
+    api.div(accumulated_mul, scale_inv, true)
 }
 
 #[cfg(test)]
