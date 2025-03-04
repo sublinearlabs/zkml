@@ -1,5 +1,5 @@
-use expander_compiler::frontend::{Config, Define, RootAPI, Variable};
 use expander_compiler::frontend::internal::DumpLoadTwoVariables;
+use expander_compiler::frontend::{Config, Define, RootAPI, Variable};
 
 struct QuantizedFloat(Variable);
 
@@ -25,8 +25,8 @@ mod tests {
     use crate::quantization::quantizer::Quantizer;
     use expander_compiler::compile::CompileOptions;
     use expander_compiler::declare_circuit;
-    use expander_compiler::field::BN254;
-    use expander_compiler::frontend::{BN254Config, compile, Define, RootAPI, Variable};
+    use expander_compiler::field::{FieldArith, BN254};
+    use expander_compiler::frontend::{compile, BN254Config, Define, RootAPI, Variable};
 
     #[test]
     fn test_quantized_add() {
@@ -45,38 +45,54 @@ mod tests {
             }
         }
 
-        const N: u8 = 2;
+        const N: u8 = 8;
         let q = Quantizer::<N> {};
         let compile_result = compile(&AddCircuit::default(), CompileOptions::default()).unwrap();
-        // TODO: make this a more complicated assignment
         let assignment = AddCircuit::<BN254> {
-            a: q.quantize(5.),
-            b: q.quantize(-2.),
-            target: q.quantize(3.)
+            a: q.quantize(-26.625),
+            b: q.quantize(40.25),
+            target: q.quantize(13.625),
         };
-        let witness = compile_result.witness_solver.solve_witness(&assignment).unwrap();
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
         let run_result = compile_result.layered_circuit.run(&witness);
         assert!(run_result.iter().all(|v| *v));
     }
 
-    // #[test]
-    // fn test_circuit() {
-    //     const N: u8 = 1;
-    //     let q = Quantizer::<N> {};
-    //     let compile_result = compile(&TestCircuit::default(), CompileOptions::default()).unwrap();
-    //     let assignment = TestCircuit::<BN254> {
-    //         a: q.quantize(3.5),
-    //         b: q.quantize(3.0),
-    //         scale_inv: BN254::from(1_u32 << N).inv().unwrap(),
-    //         target: q.quantize(10.5),
-    //     };
-    //
-    //     let witness = compile_result
-    //         .witness_solver
-    //         .solve_witness(&assignment)
-    //         .unwrap();
-    //     let run_result = compile_result.layered_circuit.run(&witness);
-    //     dbg!(run_result);
-    //     debug_eval(&TestCircuit::default(), &assignment, EmptyHintCaller)
-    // }
+    #[test]
+    fn test_quantized_mul() {
+        declare_circuit!(MulCircuit {
+            a: Variable,
+            b: Variable,
+            scale_inv: PublicVariable,
+            target: PublicVariable
+        });
+
+        impl Define<BN254Config> for MulCircuit<Variable> {
+            fn define<Builder: RootAPI<BN254Config>>(&self, api: &mut Builder) {
+                let a = QuantizedFloat(self.a);
+                let b = QuantizedFloat(self.b);
+                let sum = a.mul(api, &b, self.scale_inv);
+                api.assert_is_equal(sum.0, self.target);
+            }
+        }
+
+        const N: u8 = 8;
+        let q = Quantizer::<N> {};
+        let compile_result = compile(&MulCircuit::default(), CompileOptions::default()).unwrap();
+        let assignment = MulCircuit::<BN254> {
+            a: q.quantize(26.5),
+            b: q.quantize(-40.25),
+            scale_inv: BN254::from(q.scale()).inv().unwrap(),
+            target: q.quantize(-1066.625),
+        };
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
+        let run_result = compile_result.layered_circuit.run(&witness);
+        assert!(run_result.iter().all(|v| *v));
+    }
 }

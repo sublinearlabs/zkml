@@ -31,6 +31,11 @@ impl<const N: u8> Quantizer<N> {
         lower_u32.copy_from_slice(&value.to_bytes()[0..4]);
         i32::from_le_bytes(lower_u32) as f32 / (1 << N) as f32
     }
+
+    // TODO: add documentation
+    pub(crate) fn scale(&self) -> u32 {
+        1 << N
+    }
 }
 
 #[cfg(test)]
