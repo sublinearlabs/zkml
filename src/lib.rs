@@ -1,6 +1,7 @@
+use expander_compiler::declare_circuit;
 use expander_compiler::field::FieldArith;
 use expander_compiler::field::BN254;
-use expander_compiler::frontend::{Config, RootAPI, Variable};
+use expander_compiler::frontend::{BN254Config, Config, Define, M31Config, RootAPI, Variable};
 
 // TODO: forced to use BN254 for now, goldilocks would have been preferred
 //  might have to look into using multiple limbs of m31 or reducing the
@@ -53,13 +54,37 @@ fn mul_q<C: Config, B: RootAPI<C>>(
 ) -> Variable {
     // we need first multiply then rescale
     let accumulated_mul = api.mul(a, b);
+    api.display("acc_mul", accumulated_mul);
     // TODO: what is checked??
-    api.div(accumulated_mul, scale_inv, true)
+    api.mul(accumulated_mul, scale_inv)
+}
+
+declare_circuit!(TestCircuit {
+    a: Variable,
+    b: Variable,
+    scale_inv: Variable,
+    target: PublicVariable
+});
+
+impl Define<BN254Config> for TestCircuit<Variable> {
+    fn define<Builder: RootAPI<BN254Config>>(&self, api: &mut Builder) {
+        // let sum = add_q(api, self.a, self.b);
+        api.display("a", self.a);
+        api.display("b", self.b);
+        let prod = mul_q(api, self.a, self.b, self.scale_inv);
+        api.display("product", prod);
+        api.display("target", self.target);
+        api.assert_is_equal(prod, self.target);
+    }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::Quantizer;
+    use crate::{Quantizer, TestCircuit};
+    use expander_compiler::compile::CompileOptions;
+    use expander_compiler::field::{FieldArith, BN254};
+    use expander_compiler::frontend::extra::debug_eval;
+    use expander_compiler::frontend::{compile, BN254Config, EmptyHintCaller};
 
     #[test]
     fn test_i32_as_u32_same_bit_pattern() {
@@ -82,5 +107,26 @@ mod test {
         let q = Quantizer::<16> {};
         let v = 32767.99884033;
         assert_eq!(q.dequantize(&q.quantize(v)) - v, 0.0);
+    }
+
+    #[test]
+    fn test_circuit() {
+        const N: u8 = 1;
+        let q = Quantizer::<N> {};
+        let compile_result = compile(&TestCircuit::default(), CompileOptions::default()).unwrap();
+        let assignment = TestCircuit::<BN254> {
+            a: q.quantize(3.5),
+            b: q.quantize(3.0),
+            scale_inv: BN254::from(1_u32 << N).inv().unwrap(),
+            target: q.quantize(10.5),
+        };
+
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
+        let run_result = compile_result.layered_circuit.run(&witness);
+        dbg!(run_result);
+        debug_eval(&TestCircuit::default(), &assignment, EmptyHintCaller)
     }
 }
