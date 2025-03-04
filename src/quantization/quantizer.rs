@@ -29,7 +29,7 @@ impl<const N: u8> Quantizer<N> {
     pub(crate) fn dequantize(&self, value: &BN254) -> f32 {
         let mut lower_u32 = [0; 4];
         lower_u32.copy_from_slice(&value.to_bytes()[0..4]);
-        u32::from_le_bytes(lower_u32) as f32 / (1 << N) as f32
+        i32::from_le_bytes(lower_u32) as f32 / (1 << N) as f32
     }
 }
 
@@ -48,7 +48,7 @@ mod tests {
     fn test_f32_to_and_from_field() {
         // using precise granularity range for easy testing
         let q = Quantizer::<2> {};
-        let v = 3.5;
+        let v = -3.5;
         assert_eq!(q.dequantize(&q.quantize(v)) - v, 0.0);
 
         let q = Quantizer::<8> {};

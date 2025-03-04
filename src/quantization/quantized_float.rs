@@ -1,93 +1,82 @@
-use expander_compiler::declare_circuit;
-use expander_compiler::frontend::{BN254Config, Config, Define, RootAPI, Variable};
+use expander_compiler::frontend::{Config, Define, RootAPI, Variable};
+use expander_compiler::frontend::internal::DumpLoadTwoVariables;
 
-struct QuantizedFloat {
-    value: Variable,
-}
+struct QuantizedFloat(Variable);
 
 impl QuantizedFloat {
+    /// Circuit for add two quantized values
     fn add<C: Config, B: RootAPI<C>>(&self, api: &mut B, b: &Self) -> Self {
-        Self {
-            value: api.add(self.value, b.value),
-        }
+        QuantizedFloat(api.add(self.0, b.0))
     }
 
+    /// Circuit for multiplying two quantized values
     fn mul<C: Config, B: RootAPI<C>>(&self, api: &mut B, b: &Self, scale_inv: Variable) -> Self {
         // multiply into accumulator
-        let acc_mul = api.mul(self.value, b.value);
+        let acc_mul = api.mul(self.0, b.0);
         // rescale
         let rescaled_mul = api.mul(acc_mul, scale_inv);
-        Self {
-            value: rescaled_mul,
-        }
-    }
-}
-
-fn add_q<C: Config, B: RootAPI<C>>(api: &mut B, a: Variable, b: Variable) -> Variable {
-    api.add(a, b)
-}
-
-// TODO: add documentation
-fn mul_q<C: Config, B: RootAPI<C>>(
-    api: &mut B,
-    a: Variable,
-    b: Variable,
-    scale_inv: Variable,
-) -> Variable {
-    // we need first multiply then rescale
-    let accumulated_mul = api.mul(a, b);
-    api.display("acc_mul", accumulated_mul);
-    // TODO: what is checked??
-    api.mul(accumulated_mul, scale_inv)
-}
-
-// TODO: move this to test section
-declare_circuit!(TestCircuit {
-    a: Variable,
-    b: Variable,
-    scale_inv: Variable,
-    target: PublicVariable
-});
-
-impl Define<BN254Config> for TestCircuit<Variable> {
-    fn define<Builder: RootAPI<BN254Config>>(&self, api: &mut Builder) {
-        // let sum = add_q(api, self.a, self.b);
-        api.display("a", self.a);
-        api.display("b", self.b);
-        let prod = mul_q(api, self.a, self.b, self.scale_inv);
-        api.display("product", prod);
-        api.display("target", self.target);
-        api.assert_is_equal(prod, self.target);
+        QuantizedFloat(rescaled_mul)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::quantization::quantized_float::TestCircuit;
+    use crate::quantization::quantized_float::QuantizedFloat;
     use crate::quantization::quantizer::Quantizer;
     use expander_compiler::compile::CompileOptions;
-    use expander_compiler::field::{FieldArith, BN254};
-    use expander_compiler::frontend::extra::debug_eval;
-    use expander_compiler::frontend::{compile, EmptyHintCaller};
+    use expander_compiler::declare_circuit;
+    use expander_compiler::field::BN254;
+    use expander_compiler::frontend::{BN254Config, compile, Define, RootAPI, Variable};
 
     #[test]
-    fn test_circuit() {
-        const N: u8 = 1;
-        let q = Quantizer::<N> {};
-        let compile_result = compile(&TestCircuit::default(), CompileOptions::default()).unwrap();
-        let assignment = TestCircuit::<BN254> {
-            a: q.quantize(3.5),
-            b: q.quantize(3.0),
-            scale_inv: BN254::from(1_u32 << N).inv().unwrap(),
-            target: q.quantize(10.5),
-        };
+    fn test_quantized_add() {
+        declare_circuit!(AddCircuit {
+            a: Variable,
+            b: Variable,
+            target: PublicVariable
+        });
 
-        let witness = compile_result
-            .witness_solver
-            .solve_witness(&assignment)
-            .unwrap();
+        impl Define<BN254Config> for AddCircuit<Variable> {
+            fn define<Builder: RootAPI<BN254Config>>(&self, api: &mut Builder) {
+                let a = QuantizedFloat(self.a);
+                let b = QuantizedFloat(self.b);
+                let sum = a.add(api, &b);
+                api.assert_is_equal(sum.0, self.target);
+            }
+        }
+
+        const N: u8 = 2;
+        let q = Quantizer::<N> {};
+        let compile_result = compile(&AddCircuit::default(), CompileOptions::default()).unwrap();
+        // TODO: make this a more complicated assignment
+        let assignment = AddCircuit::<BN254> {
+            a: q.quantize(5.),
+            b: q.quantize(-2.),
+            target: q.quantize(3.)
+        };
+        let witness = compile_result.witness_solver.solve_witness(&assignment).unwrap();
         let run_result = compile_result.layered_circuit.run(&witness);
-        dbg!(run_result);
-        debug_eval(&TestCircuit::default(), &assignment, EmptyHintCaller)
+        assert!(run_result.iter().all(|v| *v));
     }
+
+    // #[test]
+    // fn test_circuit() {
+    //     const N: u8 = 1;
+    //     let q = Quantizer::<N> {};
+    //     let compile_result = compile(&TestCircuit::default(), CompileOptions::default()).unwrap();
+    //     let assignment = TestCircuit::<BN254> {
+    //         a: q.quantize(3.5),
+    //         b: q.quantize(3.0),
+    //         scale_inv: BN254::from(1_u32 << N).inv().unwrap(),
+    //         target: q.quantize(10.5),
+    //     };
+    //
+    //     let witness = compile_result
+    //         .witness_solver
+    //         .solve_witness(&assignment)
+    //         .unwrap();
+    //     let run_result = compile_result.layered_circuit.run(&witness);
+    //     dbg!(run_result);
+    //     debug_eval(&TestCircuit::default(), &assignment, EmptyHintCaller)
+    // }
 }
