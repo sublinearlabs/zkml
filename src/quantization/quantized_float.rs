@@ -1,6 +1,27 @@
 use expander_compiler::declare_circuit;
 use expander_compiler::frontend::{BN254Config, Config, Define, RootAPI, Variable};
 
+struct QuantizedFloat {
+    value: Variable,
+}
+
+impl QuantizedFloat {
+    fn add<C: Config, B: RootAPI<C>>(&self, api: &mut B, b: &Self) -> Self {
+        Self {
+            value: api.add(self.value, b.value),
+        }
+    }
+
+    fn mul<C: Config, B: RootAPI<C>>(&self, api: &mut B, b: &Self, scale_inv: Variable) -> Self {
+        // multiply into accumulator
+        let acc_mul = api.mul(self.value, b.value);
+        let rescaled_mul = api.mul(acc_mul, scale_inv);
+        Self {
+            value: rescaled_mul,
+        }
+    }
+}
+
 fn add_q<C: Config, B: RootAPI<C>>(api: &mut B, a: Variable, b: Variable) -> Variable {
     api.add(a, b)
 }
@@ -19,6 +40,7 @@ fn mul_q<C: Config, B: RootAPI<C>>(
     api.mul(accumulated_mul, scale_inv)
 }
 
+// TODO: move this to test section
 declare_circuit!(TestCircuit {
     a: Variable,
     b: Variable,
