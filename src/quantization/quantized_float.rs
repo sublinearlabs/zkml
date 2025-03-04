@@ -15,6 +15,7 @@ impl QuantizedFloat {
     fn mul<C: Config, B: RootAPI<C>>(&self, api: &mut B, b: &Self, scale_inv: Variable) -> Self {
         // multiply into accumulator
         let acc_mul = api.mul(self.value, b.value);
+        // rescale
         let rescaled_mul = api.mul(acc_mul, scale_inv);
         Self {
             value: rescaled_mul,
