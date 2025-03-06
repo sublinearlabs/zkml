@@ -1,4 +1,19 @@
-type Shape = Vec<usize>;
+struct Shape(Vec<usize>);
+
+impl Shape {
+    fn volume(&self) -> usize {
+        self.0.iter().product()
+    }
+
+    fn strides(&self) -> Vec<usize> {
+        let shape = &self.0;
+        let mut strides = vec![1; shape.len()];
+        for i in (0..shape.len() - 1).rev() {
+            strides[i] = strides[i + 1] * shape[i + 1];
+        }
+        strides
+    }
+}
 
 // TODO: add documentation
 struct Tensor<T> {
@@ -16,19 +31,11 @@ impl<T: Default + Clone> Tensor<T> {
 
     fn empty_from_shape(shape: Shape) -> Self {
         Self {
-            data: vec![T::default(); shape.iter().product()],
-            strides: compute_strides(&shape),
+            data: vec![T::default(); shape.volume()],
+            strides: shape.strides(),
             shape,
         }
     }
-}
-
-fn compute_strides(shape: &Shape) -> Vec<usize> {
-    let mut strides = vec![1; shape.len()];
-    for i in (0..shape.len() - 1).rev() {
-        strides[i] = strides[i + 1] * shape[i + 1];
-    }
-    strides
 }
 
 #[cfg(test)]
