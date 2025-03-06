@@ -1,5 +1,3 @@
-use std::thread::current;
-
 /// Flat representation of an n-dimensional tensor
 struct Tensor<T> {
     data: Vec<T>,
@@ -32,6 +30,7 @@ impl<T: Default + Clone> Tensor<T> {
     }
 }
 
+#[derive(Clone)]
 /// Represents the shape of a tensor
 struct Shape {
     dims: Vec<usize>,
@@ -61,6 +60,12 @@ impl Shape {
             .zip(index.iter())
             .map(|(a, b)| a * b)
             .sum()
+    }
+
+    /// Returns an iterator that allows you to iterate over
+    /// possible indexes allowed by the shape
+    fn index_iter(&self) -> ShapeIndices {
+        ShapeIndices::new(self.clone())
     }
 }
 
