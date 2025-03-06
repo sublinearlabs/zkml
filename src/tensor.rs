@@ -1,3 +1,27 @@
+/// Flat representation of an n-dimensional tensor
+struct Tensor<T> {
+    data: Vec<T>,
+    shape: Shape,
+    strides: Vec<usize>,
+}
+
+impl<T: Default + Clone> Tensor<T> {
+    fn new(data: Option<Vec<T>>, shape: Shape) -> Self {
+        let data = if let Some(data) = data {
+            assert!(data.len() == shape.volume());
+            data
+        } else {
+            vec![T::default(); shape.volume()]
+        };
+
+        Self {
+            data,
+            strides: shape.strides(),
+            shape,
+        }
+    }
+}
+
 struct Shape(Vec<usize>);
 
 impl Shape {
@@ -15,37 +39,14 @@ impl Shape {
     }
 }
 
-// TODO: add documentation
-struct Tensor<T> {
-    data: Vec<T>,
-    shape: Shape,
-    strides: Vec<usize>,
-}
-
-impl<T: Default + Clone> Tensor<T> {
-    fn new(data: Vec<T>, shape: Shape) -> Self {
-        let mut t = Self::empty_from_shape(shape);
-        t.data = data;
-        t
-    }
-
-    fn empty_from_shape(shape: Shape) -> Self {
-        Self {
-            data: vec![T::default(); shape.volume()],
-            strides: shape.strides(),
-            shape,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::tensor::Tensor;
+    use crate::tensor::{Shape, Tensor};
 
     #[test]
     fn test_tensor_stride_construction() {
         assert_eq!(
-            Tensor::<u32>::empty_from_shape(vec![2, 3, 2, 4]).strides,
+            Tensor::<u32>::new(None, Shape(vec![2, 3, 2, 4])).strides,
             vec![24, 8, 4, 1]
         );
     }
