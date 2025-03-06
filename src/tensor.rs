@@ -31,9 +31,9 @@ impl<T: Default + Clone> Tensor<T> {
 }
 
 /// Represents the shape of a tensor
-struct Shape {
-    dims: Vec<usize>,
-    strides: Vec<usize>,
+pub(crate) struct Shape {
+    pub(crate) dims: Vec<usize>,
+    pub(crate) strides: Vec<usize>,
 }
 
 impl Shape {
