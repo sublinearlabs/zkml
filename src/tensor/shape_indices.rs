@@ -1,10 +1,11 @@
 use crate::tensor::shape::Shape;
 
-// TODO: add documentation
-
+/// Holds state for shape index iteration
 pub(crate) struct ShapeIndices {
     pub(crate) shape: Shape,
     current: Option<Vec<usize>>,
+    /// Fixes the value of a particular dimension
+    /// Vec<(index, fixed_value)>
     fixed_indices: Vec<(usize, usize)>,
 }
 
@@ -23,7 +24,8 @@ impl ShapeIndices {
         }
     }
 
-    // TODO: document
+    /// Given the current index state, compute the next one
+    /// Returns None if last state has been reached
     fn next_inner(&mut self) -> Option<Vec<usize>> {
         let current = self.current.as_ref()?;
 
