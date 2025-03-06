@@ -16,14 +16,15 @@ impl ShapeIndices {
             Some(vec![])
         };
 
-        Self { shape, current, fixed_indices: fixed_indices.unwrap_or(vec![])}
+        Self {
+            shape,
+            current,
+            fixed_indices: fixed_indices.unwrap_or(vec![]),
+        }
     }
-}
 
-impl Iterator for ShapeIndices {
-    type Item = Vec<usize>;
-
-    fn next(&mut self) -> Option<Self::Item> {
+    // TODO: document
+    fn next_inner(&mut self) -> Option<Vec<usize>> {
         let current = self.current.as_ref()?;
 
         if current.is_empty() {
@@ -50,6 +51,30 @@ impl Iterator for ShapeIndices {
 
         self.current = None;
         None
+    }
+}
+
+impl Iterator for ShapeIndices {
+    type Item = Vec<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut maybe_next = self.next_inner();
+
+        while let (to_check) = maybe_next.as_ref()? {
+            let is_match = self
+                .fixed_indices
+                .iter()
+                .map(|(index, expected_val)| to_check[*index] == *expected_val)
+                .all(|v| v);
+
+            if is_match {
+                return maybe_next;
+            }
+
+            maybe_next = self.next_inner();
+        }
+
+        maybe_next
     }
 }
 
@@ -87,11 +112,7 @@ mod tests {
             // fix a = 1 and c = 2
             // to get [1, b, 2] for every b
             a.index_iter(Some(vec![(0, 1), (2, 2)])).collect::<Vec<_>>(),
-            vec![
-                vec![1, 0, 2],
-                vec![1, 1, 2],
-                vec![1, 2, 2],
-            ]
+            vec![vec![1, 0, 2], vec![1, 1, 2], vec![1, 2, 2],]
         );
     }
 }

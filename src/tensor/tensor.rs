@@ -34,8 +34,8 @@ impl<T: Default + Clone> Tensor<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::tensor::shape::Shape;
     use super::Tensor;
+    use crate::tensor::shape::Shape;
 
     #[test]
     fn test_tensor_value_retrieval_and_manipulation() {
