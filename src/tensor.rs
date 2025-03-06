@@ -2,7 +2,6 @@
 struct Tensor<T> {
     data: Vec<T>,
     shape: Shape,
-    strides: Vec<usize>,
 }
 
 impl<T: Default + Clone> Tensor<T> {
@@ -14,40 +13,42 @@ impl<T: Default + Clone> Tensor<T> {
             vec![T::default(); shape.volume()]
         };
 
-        Self {
-            data,
-            strides: shape.strides(),
-            shape,
-        }
+        Self { data, shape }
     }
 }
 
-struct Shape(Vec<usize>);
+struct Shape {
+    dims: Vec<usize>,
+    strides: Vec<usize>,
+}
 
 impl Shape {
-    fn volume(&self) -> usize {
-        self.0.iter().product()
+    fn new(dims: Vec<usize>) -> Self {
+        Self {
+            strides: compute_strides(&dims),
+            dims,
+        }
     }
 
-    fn strides(&self) -> Vec<usize> {
-        let shape = &self.0;
-        let mut strides = vec![1; shape.len()];
-        for i in (0..shape.len() - 1).rev() {
-            strides[i] = strides[i + 1] * shape[i + 1];
-        }
-        strides
+    fn volume(&self) -> usize {
+        self.dims.iter().product()
     }
+}
+
+fn compute_strides(dims: &[usize]) -> Vec<usize> {
+    let mut strides = vec![1; dims.len()];
+    for i in (0..dims.len() - 1).rev() {
+        strides[i] = strides[i + 1] * dims[i + 1];
+    }
+    strides
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::tensor::{Shape, Tensor};
+    use crate::tensor::Shape;
 
     #[test]
-    fn test_tensor_stride_construction() {
-        assert_eq!(
-            Tensor::<u32>::new(None, Shape(vec![2, 3, 2, 4])).strides,
-            vec![24, 8, 4, 1]
-        );
+    fn test_strides_computation() {
+        assert_eq!(Shape::new(vec![2, 3, 2, 4]).strides, vec![24, 8, 4, 1]);
     }
 }
