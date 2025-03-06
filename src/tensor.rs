@@ -155,5 +155,18 @@ mod tests {
             a.index_iter().collect::<Vec<_>>(),
             vec![vec![0], vec![1], vec![2], vec![3], vec![4]]
         );
+
+        let a = Shape::new(vec![2, 3]);
+        assert_eq!(
+            a.index_iter().collect::<Vec<_>>(),
+            vec![
+                vec![0, 0],
+                vec![0, 1],
+                vec![0, 2],
+                vec![1, 0],
+                vec![1, 1],
+                vec![1, 2]
+            ]
+        );
     }
 }
