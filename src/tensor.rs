@@ -77,27 +77,32 @@ struct ShapeIndices {
     current: Option<Vec<usize>>,
 }
 
+//impl ShapeIndices
+
 impl Iterator for ShapeIndices {
     type Item = Vec<usize>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(current) = &self.current {
-            let mut next = current.clone();
+        let current = self.current.as_ref()?;
 
-            // iterate from the back we need to ensure that we are not up to the max
-            for i in (0..next.len()).rev() {
-                if next[i] == self.shape.dims[i] - 1 {
-                    next[i] = 0;
-                } else {
-                    next[i] += 1;
-                    return Some(next);
-                }
+        let mut next = current.clone();
+
+        for i in (0..next.len()).rev() {
+            if next[i] < self.shape.dims[i] - 1 {
+                // if we can increment this position
+                // we do so and return
+                next[i] += 1;
+                self.current = Some(next);
+                return self.current.clone();
+            } else {
+                // reset this position and continue
+                // to the next dimension
+                next[i] = 0
             }
-
-            None
-        } else {
-            None
         }
+
+        self.current = None;
+        None
     }
 }
 
@@ -122,4 +127,7 @@ mod tests {
         *a.get_mut(&[2, 0]) = 20;
         assert_eq!(a.get(&[2, 0]), &20);
     }
+
+    #[test]
+    fn test_shape_index_iterator() {}
 }
