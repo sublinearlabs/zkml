@@ -87,7 +87,7 @@ impl ShapeIndices {
         let current = if shape.volume() == 0 {
             None
         } else {
-            Some(vec![0; shape.dims.len()])
+            Some(vec![])
         };
         Self { shape, current }
     }
@@ -98,6 +98,12 @@ impl Iterator for ShapeIndices {
 
     fn next(&mut self) -> Option<Self::Item> {
         let current = self.current.as_ref()?;
+
+        if current.is_empty() {
+            // first iteration
+            self.current = Some(vec![0; self.shape.dims.len()]);
+            return self.current.clone();
+        }
 
         let mut next = current.clone();
 
@@ -143,5 +149,11 @@ mod tests {
     }
 
     #[test]
-    fn test_shape_index_iterator() {}
+    fn test_shape_index_iterator() {
+        let a = Shape::new(vec![5]);
+        assert_eq!(
+            a.index_iter().collect::<Vec<_>>(),
+            vec![vec![0], vec![1], vec![2], vec![3], vec![4]]
+        );
+    }
 }
