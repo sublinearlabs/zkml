@@ -1,3 +1,5 @@
+use std::thread::current;
+
 /// Flat representation of an n-dimensional tensor
 struct Tensor<T> {
     data: Vec<T>,
@@ -68,6 +70,35 @@ fn compute_strides(dims: &[usize]) -> Vec<usize> {
         strides[i] = strides[i + 1] * dims[i + 1];
     }
     strides
+}
+
+struct ShapeIndices {
+    shape: Shape,
+    current: Option<Vec<usize>>,
+}
+
+impl Iterator for ShapeIndices {
+    type Item = Vec<usize>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(current) = &self.current {
+            let mut next = current.clone();
+
+            // iterate from the back we need to ensure that we are not up to the max
+            for i in (0..next.len()).rev() {
+                if next[i] == self.shape.dims[i] - 1 {
+                    next[i] = 0;
+                } else {
+                    next[i] += 1;
+                    return Some(next);
+                }
+            }
+
+            None
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]
