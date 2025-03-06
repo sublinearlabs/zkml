@@ -1,2 +1,2 @@
 mod quantization;
-mod tensor;
+pub(crate) mod tensor;
