@@ -32,10 +32,11 @@ impl Shape {
             .sum()
     }
 
+    // TODO: update documentation for fixed indices
     /// Returns an iterator that allows you to iterate over
     /// possible indexes allowed by the shape
-    pub(crate) fn index_iter(&self) -> ShapeIndices {
-        ShapeIndices::new(self.clone())
+    pub(crate) fn index_iter(&self, fixed_indices: Option<Vec<(usize, usize)>>) -> ShapeIndices {
+        ShapeIndices::new(self.clone(), fixed_indices)
     }
 }
 
