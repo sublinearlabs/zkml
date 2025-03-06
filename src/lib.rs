@@ -1,3 +1,3 @@
 mod quantization;
-mod tensor;
 mod supported_ops;
+pub(crate) mod tensor;

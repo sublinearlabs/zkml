@@ -1,4 +1,4 @@
-use crate::tensor::Shape;
+use crate::tensor::shape::Shape;
 
 struct OpInfo {
     // Index where the Ops data starts in the input data

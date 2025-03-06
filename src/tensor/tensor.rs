@@ -1,3 +1,5 @@
+use crate::tensor::shape::Shape;
+
 /// Flat representation of an n-dimensional tensor
 struct Tensor<T> {
     data: Vec<T>,
@@ -30,56 +32,10 @@ impl<T: Default + Clone> Tensor<T> {
     }
 }
 
-/// Represents the shape of a tensor
-pub(crate) struct Shape {
-    pub(crate) dims: Vec<usize>,
-    pub(crate) strides: Vec<usize>,
-}
-
-impl Shape {
-    /// Instantiates a new shape (computes stride values at this point)
-    fn new(dims: Vec<usize>) -> Self {
-        Self {
-            strides: compute_strides(&dims),
-            dims,
-        }
-    }
-
-    /// Compute the number of elements in the tensor
-    fn volume(&self) -> usize {
-        self.dims.iter().product()
-    }
-
-    /// Converts a multi-dimensional index to a flat index
-    fn flat_index(&self, index: &[usize]) -> usize {
-        assert!(self.dims.len() == index.len());
-        // dot product
-        self.strides
-            .iter()
-            .zip(index.iter())
-            .map(|(a, b)| a * b)
-            .sum()
-    }
-}
-
-fn compute_strides(dims: &[usize]) -> Vec<usize> {
-    let mut strides = vec![1; dims.len()];
-    for i in (0..dims.len() - 1).rev() {
-        strides[i] = strides[i + 1] * dims[i + 1];
-    }
-    strides
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::tensor::Shape;
-
     use super::Tensor;
-
-    #[test]
-    fn test_strides_computation() {
-        assert_eq!(Shape::new(vec![2, 3, 2, 4]).strides, vec![24, 8, 4, 1]);
-    }
+    use crate::tensor::shape::Shape;
 
     #[test]
     fn test_tensor_value_retrieval_and_manipulation() {
