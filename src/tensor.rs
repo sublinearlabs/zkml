@@ -77,7 +77,16 @@ struct ShapeIndices {
     current: Option<Vec<usize>>,
 }
 
-//impl ShapeIndices
+impl ShapeIndices {
+    fn new(shape: Shape) -> Self {
+        let current = if shape.volume() == 0 {
+            None
+        } else {
+            Some(vec![0; shape.dims.len()])
+        };
+        Self { shape, current }
+    }
+}
 
 impl Iterator for ShapeIndices {
     type Item = Vec<usize>;
