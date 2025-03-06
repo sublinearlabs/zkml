@@ -57,6 +57,8 @@ impl ShapeIndices {
 impl Iterator for ShapeIndices {
     type Item = Vec<usize>;
 
+    // NOTE: naive implementation of index iteration with fixed values
+    // can be more exact rather than guessing
     fn next(&mut self) -> Option<Self::Item> {
         let mut maybe_next = self.next_inner();
 
@@ -113,6 +115,22 @@ mod tests {
             // to get [1, b, 2] for every b
             a.index_iter(Some(vec![(0, 1), (2, 2)])).collect::<Vec<_>>(),
             vec![vec![1, 0, 2], vec![1, 1, 2], vec![1, 2, 2],]
+        );
+
+        let a = Shape::new(vec![2, 3, 3]);
+        assert_eq!(
+            a.index_iter(Some(vec![(0, 0)])).collect::<Vec<_>>(),
+            vec![
+                vec![0, 0, 0],
+                vec![0, 0, 1],
+                vec![0, 0, 2],
+                vec![0, 1, 0],
+                vec![0, 1, 1],
+                vec![0, 1, 2],
+                vec![0, 2, 0],
+                vec![0, 2, 1],
+                vec![0, 2, 2],
+            ]
         );
     }
 }
