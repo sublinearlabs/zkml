@@ -7,6 +7,8 @@ pub(crate) struct Shape {
     strides: Vec<usize>,
 }
 
+// TODO: deal with empty shape
+
 impl Shape {
     /// Instantiates a new shape (computes stride values at this point)
     pub(crate) fn new(dims: Vec<usize>) -> Self {

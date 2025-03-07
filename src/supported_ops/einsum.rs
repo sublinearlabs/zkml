@@ -3,6 +3,7 @@ use crate::tensor::shape_indices::ShapeIndices;
 use crate::tensor::tensor::Tensor;
 use std::collections::{BTreeSet, HashMap};
 
+// TODO: add documentation
 struct FixedShapeGenerator {
     // Vec<(source, target)>
     mapping: Vec<(usize, usize)>,
@@ -134,9 +135,26 @@ impl Iterator for IndexZip {
 
 #[cfg(test)]
 mod tests {
-    use crate::supported_ops::einsum::einsum;
+    use crate::supported_ops::einsum::{einsum, FixedShapeGenerator};
     use crate::tensor::shape::Shape;
     use crate::tensor::tensor::Tensor;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_fixed_shape_generator() {
+        // assume einsum instruction ij,jk->ik
+        // free variables should be [i->0, k->1]
+        // for the first input ij we expect the mapping [(0,0)]
+        // for the second input jk we expect the mapping [(1,1)]
+
+        let free_variables: HashMap<char, usize> = vec![('i', 0), ('k', 1)].into_iter().collect();
+        let mapping_1 =
+            FixedShapeGenerator::from("ij", &free_variables, Shape::new(vec![1])).mapping;
+        assert_eq!(mapping_1, vec![(0, 0)]);
+        let mapping_2 =
+            FixedShapeGenerator::from("jk", &free_variables, Shape::new(vec![1])).mapping;
+        assert_eq!(mapping_2, vec![(1, 1)]);
+    }
 
     #[test]
     fn test_einsum() {
