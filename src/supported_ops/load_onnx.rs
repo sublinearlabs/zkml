@@ -1,11 +1,8 @@
 use std::path::PathBuf;
 
-use tract_core::ops::{binary::BinMiniOp, einsum};
 use tract_onnx::prelude::*;
 
-use crate::{supported_ops::Einsum, tensor::Shape};
-
-use super::{parse_tract_op, Constant, Input, OpInfo, SupportedAdd, SupportedOps, TractOps};
+use super::parse_tract_op;
 
 fn load_onnx(path: PathBuf) {
     let model = tract_onnx::onnx()

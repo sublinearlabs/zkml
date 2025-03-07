@@ -1,8 +1,7 @@
 use tract_core::{
-    downcast_rs::Downcast,
     internal::DimLike,
     ops::{
-        binary::{BinMiniOp, TypedBinOp},
+        binary::TypedBinOp,
         einsum::EinSum,
         konst::Const,
         math::{Add, Sub},
@@ -12,7 +11,8 @@ use tract_core::{
     prelude::*,
 };
 
-use crate::tensor::Shape;
+use crate::tensor::shape::Shape;
+
 mod load_onnx;
 
 #[derive(Debug, Clone)]
@@ -30,7 +30,7 @@ impl OpInfo {
 }
 
 #[derive(Debug, Clone)]
-enum SupportedOps {
+pub(crate) enum SupportedOps {
     Add(SupportedAdd),
     Constant(Constant),
     Input(Input),
