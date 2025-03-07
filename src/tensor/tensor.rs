@@ -1,16 +1,18 @@
 use crate::tensor::shape::Shape;
+use clap::Parser;
 
+#[derive(Debug, PartialEq)]
 /// Flat representation of an n-dimensional tensor
-struct Tensor<T> {
+pub(crate) struct Tensor<T> {
     data: Vec<T>,
-    shape: Shape,
+    pub(crate) shape: Shape,
 }
 
 impl<T: Default + Clone> Tensor<T> {
     /// Instantiates a new Tensor
     /// ensures the size of data matches the shape
     /// if no data, performs default T allocation of correct size
-    fn new(data: Option<Vec<T>>, shape: Shape) -> Self {
+    pub(crate) fn new(data: Option<Vec<T>>, shape: Shape) -> Self {
         let data = if let Some(data) = data {
             assert!(data.len() == shape.volume());
             data

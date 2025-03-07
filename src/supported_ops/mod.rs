@@ -13,8 +13,8 @@ use tract_core::{
 
 use crate::tensor::shape::Shape;
 
-mod load_onnx;
 mod einsum;
+mod load_onnx;
 
 #[derive(Debug, Clone)]
 struct OpInfo {

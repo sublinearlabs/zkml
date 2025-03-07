@@ -3422,6 +3422,7 @@ dependencies = [
 name = "zkml"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "expander_compiler",
  "tract-core",
  "tract-onnx",
