@@ -2,6 +2,7 @@ use crate::tensor::shape::Shape;
 use crate::tensor::tensor::Tensor;
 use expander_compiler::frontend::{Config, RootAPI, Variable};
 use std::collections::{BTreeSet, HashMap};
+use expander_compiler::builder::basic::RootBuilder;
 use tract_core::internal::tract_itertools::Itertools;
 
 struct EinSum {
@@ -57,119 +58,197 @@ impl EinSum {
         }
     }
 
-    fn compute(&self, inputs: &[Tensor<usize>]) -> Tensor<usize> {
+    // TODO: rename to compute
+    fn build<T: Copy + Clone + Default, B: RootAPI<C>, C: Config, P, S>(&self, builder: &mut B, inputs: &[Tensor<T>], mut prod_fn: P, mut sum_fn: S) -> Tensor<T>
+    where
+        P: FnMut(&mut B, &[T]) -> T,
+        S: FnMut(&mut B, &[T]) -> T,
+    {
         let mut output_tensor = Tensor::new(None, self.output_shape.clone());
-
         for output_index in output_tensor.shape.index_iter(None) {
-            let mut index_map: HashMap<char, usize> = self
+            // TODO: document subsection
+            let base_index_map: HashMap<char, usize> = self
                 .output_str
                 .iter()
                 .zip(output_index.iter())
                 .map(|(&c, &v)| (c, v))
                 .collect();
-
             let summed_keys: Vec<char> = self.summed_indices.keys().copied().collect();
             let summed_ranges: Vec<Vec<usize>> = summed_keys
                 .iter()
                 .map(|c| (0..self.summed_indices[c]).collect())
                 .collect();
 
-            let value = if summed_keys.is_empty() {
-                self.input_str
-                    .iter()
-                    .zip(inputs.iter())
-                    .map(|(inst, tensor)| {
-                        let indices: Vec<usize> = inst.iter().map(|c| index_map[&c]).collect();
-                        tensor.get(&indices)
-                    })
-                    .product::<usize>()
+            // TODO: document this section
+            let combinations = if summed_ranges.is_empty() {
+                vec![vec![]]
             } else {
-                let combinations = summed_ranges.into_iter().multi_cartesian_product();
-                combinations
-                    .map(|combo| {
-                        for (&c, &v) in summed_keys.iter().zip(combo.iter()) {
-                            index_map.insert(c, v);
-                        }
-                        self.input_str
-                            .iter()
-                            .zip(inputs.iter())
-                            .map(|(inst, tensor)| {
-                                let indices: Vec<usize> =
-                                    inst.iter().map(|c| index_map[&c]).collect();
-                                tensor.get(&indices)
-                            })
-                            .product::<usize>()
-                    })
-                    .sum()
+                summed_ranges
+                    .into_iter()
+                    .multi_cartesian_product()
+                    .collect_vec()
             };
+
+            // TODO: document this section
+            let products: Vec<T> = combinations
+                .into_iter()
+                .map(|combo| {
+                    let mut index_map = base_index_map.clone();
+                    for (&c, &v) in summed_keys.iter().zip(combo.iter()) {
+                        index_map.insert(c, v);
+                    }
+                    let elements: Vec<T> = self
+                        .input_str
+                        .iter()
+                        .zip(inputs.iter())
+                        .map(|(inst, tensor)| {
+                            let indices: Vec<usize> = inst.iter().map(|c| index_map[c]).collect();
+                            *tensor.get(&indices)
+                        })
+                        .collect();
+                    prod_fn(builder, &elements)
+                })
+                .collect();
+
+            let value = sum_fn(builder, &products);
 
             *output_tensor.get_mut(&output_index) = value;
         }
-
         output_tensor
     }
+
+    fn compute(&self, inputs: &[Tensor<usize>]) -> Tensor<usize> {
+        let mut dummy = ();
+        self.build(
+            &mut dummy,
+            inputs,
+            |_, values| values.iter().product(),
+            |_, values| values.iter().sum(),
+        )
+    }
+
+    fn create_circuit<Builder: RootAPI<T>, T: Config>(&self, builder: &mut Builder, inputs: &[Tensor<Variable>]) -> Tensor<Variable> {
+        self.build(
+            builder,
+            inputs,
+            |builder, values| prod_vars(builder, values),
+            |builder, values| sum_vars(builder, values)
+        )
+    }
+
+    // fn compute(&self, inputs: &[Tensor<usize>]) -> Tensor<usize> {
+    //     let mut output_tensor = Tensor::new(None, self.output_shape.clone());
+    //
+    //     for output_index in output_tensor.shape.index_iter(None) {
+    //         let mut index_map: HashMap<char, usize> = self
+    //             .output_str
+    //             .iter()
+    //             .zip(output_index.iter())
+    //             .map(|(&c, &v)| (c, v))
+    //             .collect();
+    //
+    //         let summed_keys: Vec<char> = self.summed_indices.keys().copied().collect();
+    //         let summed_ranges: Vec<Vec<usize>> = summed_keys
+    //             .iter()
+    //             .map(|c| (0..self.summed_indices[c]).collect())
+    //             .collect();
+    //
+    //         let value = if summed_keys.is_empty() {
+    //             self.input_str
+    //                 .iter()
+    //                 .zip(inputs.iter())
+    //                 .map(|(inst, tensor)| {
+    //                     let indices: Vec<usize> = inst.iter().map(|c| index_map[&c]).collect();
+    //                     tensor.get(&indices)
+    //                 })
+    //                 .product::<usize>()
+    //         } else {
+    //             let combinations = summed_ranges.into_iter().multi_cartesian_product();
+    //             combinations
+    //                 .map(|combo| {
+    //                     for (&c, &v) in summed_keys.iter().zip(combo.iter()) {
+    //                         index_map.insert(c, v);
+    //                     }
+    //                     self.input_str
+    //                         .iter()
+    //                         .zip(inputs.iter())
+    //                         .map(|(inst, tensor)| {
+    //                             let indices: Vec<usize> =
+    //                                 inst.iter().map(|c| index_map[&c]).collect();
+    //                             tensor.get(&indices)
+    //                         })
+    //                         .product::<usize>()
+    //                 })
+    //                 .sum()
+    //         };
+    //
+    //         *output_tensor.get_mut(&output_index) = value;
+    //     }
+    //
+    //     output_tensor
+    // }
 
     // TODO: clean up + remove duplicates
-    fn create_circuit<Builder: RootAPI<T>, T: Config>(
-        &self,
-        builder: &mut Builder,
-        inputs: &[Tensor<Variable>],
-    ) -> Tensor<Variable> {
-        let mut output_tensor = Tensor::new(None, self.output_shape.clone());
-
-        for output_index in output_tensor.shape.index_iter(None) {
-            let mut index_map: HashMap<char, usize> = self
-                .output_str
-                .iter()
-                .zip(output_index.iter())
-                .map(|(&c, &v)| (c, v))
-                .collect();
-
-            let summed_keys: Vec<char> = self.summed_indices.keys().copied().collect();
-            let summed_ranges: Vec<Vec<usize>> = summed_keys
-                .iter()
-                .map(|c| (0..self.summed_indices[c]).collect())
-                .collect();
-
-            let value = if summed_keys.is_empty() {
-                let vars = self
-                    .input_str
-                    .iter()
-                    .zip(inputs.iter())
-                    .map(|(inst, tensor)| {
-                        let indices: Vec<usize> = inst.iter().map(|c| index_map[&c]).collect();
-                        *tensor.get(&indices)
-                    })
-                    .collect_vec();
-                prod_vars(builder, vars.as_slice())
-            } else {
-                let combinations = summed_ranges.into_iter().multi_cartesian_product();
-                let vars = combinations
-                    .map(|combo| {
-                        for (&c, &v) in summed_keys.iter().zip(combo.iter()) {
-                            index_map.insert(c, v);
-                        }
-                        let vars = self
-                            .input_str
-                            .iter()
-                            .zip(inputs.iter())
-                            .map(|(inst, tensor)| {
-                                let indices: Vec<usize> =
-                                    inst.iter().map(|c| index_map[&c]).collect();
-                                *tensor.get(&indices)
-                            })
-                            .collect_vec();
-                        prod_vars(builder, vars.as_slice())
-                    })
-                    .collect_vec();
-                sum_vars(builder, vars.as_slice())
-            };
-
-            *output_tensor.get_mut(&output_index) = value;
-        }
-
-        output_tensor
-    }
+    // fn create_circuit<Builder: RootAPI<T>, T: Config>(
+    //     &self,
+    //     builder: &mut Builder,
+    //     inputs: &[Tensor<Variable>],
+    // ) -> Tensor<Variable> {
+    //     let mut output_tensor = Tensor::new(None, self.output_shape.clone());
+    //
+    //     for output_index in output_tensor.shape.index_iter(None) {
+    //         let mut index_map: HashMap<char, usize> = self
+    //             .output_str
+    //             .iter()
+    //             .zip(output_index.iter())
+    //             .map(|(&c, &v)| (c, v))
+    //             .collect();
+    //
+    //         let summed_keys: Vec<char> = self.summed_indices.keys().copied().collect();
+    //         let summed_ranges: Vec<Vec<usize>> = summed_keys
+    //             .iter()
+    //             .map(|c| (0..self.summed_indices[c]).collect())
+    //             .collect();
+    //
+    //         let value = if summed_keys.is_empty() {
+    //             let vars = self
+    //                 .input_str
+    //                 .iter()
+    //                 .zip(inputs.iter())
+    //                 .map(|(inst, tensor)| {
+    //                     let indices: Vec<usize> = inst.iter().map(|c| index_map[&c]).collect();
+    //                     *tensor.get(&indices)
+    //                 })
+    //                 .collect_vec();
+    //             prod_vars(builder, vars.as_slice())
+    //         } else {
+    //             let combinations = summed_ranges.into_iter().multi_cartesian_product();
+    //             let vars = combinations
+    //                 .map(|combo| {
+    //                     for (&c, &v) in summed_keys.iter().zip(combo.iter()) {
+    //                         index_map.insert(c, v);
+    //                     }
+    //                     let vars = self
+    //                         .input_str
+    //                         .iter()
+    //                         .zip(inputs.iter())
+    //                         .map(|(inst, tensor)| {
+    //                             let indices: Vec<usize> =
+    //                                 inst.iter().map(|c| index_map[&c]).collect();
+    //                             *tensor.get(&indices)
+    //                         })
+    //                         .collect_vec();
+    //                     prod_vars(builder, vars.as_slice())
+    //                 })
+    //                 .collect_vec();
+    //             sum_vars(builder, vars.as_slice())
+    //         };
+    //
+    //         *output_tensor.get_mut(&output_index) = value;
+    //     }
+    //
+    //     output_tensor
+    // }
 }
 
 fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
