@@ -10,7 +10,6 @@ use tract_core::{
     },
     prelude::*,
 };
-use crate::supported_ops::einsum::Einsum;
 
 use crate::tensor::shape::Shape;
 
@@ -52,6 +51,15 @@ struct Constant {
     info: OpInfo,
     name: String,
     data: Arc<Tensor>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Einsum {
+    name: String,
+    id: usize,
+    instruction: String,
+    input_count: usize,
+    output_count: usize,
 }
 
 #[derive(Debug, Clone)]
