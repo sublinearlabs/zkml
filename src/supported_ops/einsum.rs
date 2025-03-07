@@ -1,5 +1,6 @@
 use crate::tensor::shape::Shape;
 use crate::tensor::tensor::Tensor;
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 use std::collections::{BTreeSet, HashMap};
 use tract_core::internal::tract_itertools::Itertools;
 
@@ -107,6 +108,68 @@ impl EinSum {
 
         output_tensor
     }
+
+    // TODO: clean up + remove duplicates
+    fn create_circuit<Builder: RootAPI<T>, T: Config>(
+        &self,
+        builder: &mut Builder,
+        inputs: &[Tensor<Variable>],
+    ) -> Tensor<Variable> {
+        let mut output_tensor = Tensor::new(None, self.output_shape.clone());
+
+        for output_index in output_tensor.shape.index_iter(None) {
+            let mut index_map: HashMap<char, usize> = self
+                .output_str
+                .iter()
+                .zip(output_index.iter())
+                .map(|(&c, &v)| (c, v))
+                .collect();
+
+            let summed_keys: Vec<char> = self.summed_indices.keys().copied().collect();
+            let summed_ranges: Vec<Vec<usize>> = summed_keys
+                .iter()
+                .map(|c| (0..self.summed_indices[c]).collect())
+                .collect();
+
+            let value = if summed_keys.is_empty() {
+                let vars = self
+                    .input_str
+                    .iter()
+                    .zip(inputs.iter())
+                    .map(|(inst, tensor)| {
+                        let indices: Vec<usize> = inst.iter().map(|c| index_map[&c]).collect();
+                        *tensor.get(&indices)
+                    })
+                    .collect_vec();
+                prod_vars(builder, vars.as_slice())
+            } else {
+                let combinations = summed_ranges.into_iter().multi_cartesian_product();
+                let vars = combinations
+                    .map(|combo| {
+                        for (&c, &v) in summed_keys.iter().zip(combo.iter()) {
+                            index_map.insert(c, v);
+                        }
+                        let vars = self
+                            .input_str
+                            .iter()
+                            .zip(inputs.iter())
+                            .map(|(inst, tensor)| {
+                                let indices: Vec<usize> =
+                                    inst.iter().map(|c| index_map[&c]).collect();
+                                *tensor.get(&indices)
+                            })
+                            .collect_vec();
+                        prod_vars(builder, vars.as_slice())
+                    })
+                    .collect_vec();
+                sum_vars(builder, vars.as_slice())
+            };
+
+            *output_tensor.get_mut(&output_index) = value;
+        }
+
+        output_tensor
+    }
 }
 
 fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
@@ -119,6 +182,27 @@ fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
             .as_slice(),
     );
     einsum_params.compute(inputs)
+}
+
+fn sum_vars<Builder: RootAPI<T>, T: Config>(builder: &mut Builder, input: &[Variable]) -> Variable {
+    // TODO: add proper error handling
+    input
+        .iter()
+        .cloned()
+        .reduce(|acc, curr| builder.add(acc, curr))
+        .unwrap()
+}
+
+fn prod_vars<Builder: RootAPI<T>, T: Config>(
+    builder: &mut Builder,
+    input: &[Variable],
+) -> Variable {
+    // TODO: add proper error handling
+    input
+        .iter()
+        .cloned()
+        .reduce(|acc, curr| builder.mul(acc, curr))
+        .unwrap()
 }
 
 #[cfg(test)]
