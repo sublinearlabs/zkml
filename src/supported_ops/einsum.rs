@@ -2,7 +2,24 @@ use crate::tensor::shape::Shape;
 use crate::tensor::shape_indices::ShapeIndices;
 use crate::tensor::tensor::Tensor;
 use std::collections::{BTreeSet, HashMap};
-use tract_core::ndarray::indices;
+
+struct FixedShapeGenerator {
+    // Vec<(source, target)>
+    mapping: Vec<(usize, usize)>,
+    shape: Shape,
+}
+
+impl FixedShapeGenerator {
+    fn from(input_str: &str, free_variable_positions: &HashMap<char, usize>, shape: Shape) -> Self {
+        let mut mapping = vec![];
+        for (target, var) in input_str.chars().enumerate() {
+            if let Some(source) = free_variable_positions.get(&var) {
+                mapping.push((*source, target));
+            }
+        }
+        Self { mapping, shape }
+    }
+}
 
 // TODO: add documentation
 fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
@@ -37,6 +54,7 @@ fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
     // everytime we get an output index, we should link the values with the concrete index value
     // that can be done implicitly
     // next we should generate fixed iterators for the input shapes
+    //
 
     let free_variables: BTreeSet<char> = output_insn.chars().collect();
     let free_variable_positions: HashMap<char, usize> = free_variables
@@ -44,8 +62,6 @@ fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
         .enumerate()
         .map(|(i, v)| (*v, i))
         .collect();
-
-    dbg!(&free_variable_positions);
 
     // generate output shape
     let mut output_shape = vec![0; output_insn.len()];
@@ -127,6 +143,14 @@ mod tests {
         let a = Tensor::new(Some(vec![2, 3, 4, 5]), Shape::new(vec![2, 2]));
         let b = Tensor::new(Some(vec![6, 7, 8, 9]), Shape::new(vec![2, 2]));
         let result = einsum("ij,jk->ik", &[a, b]);
+        assert_eq!(
+            result,
+            Tensor::new(Some(vec![36, 41, 64, 73]), Shape::new(vec![2, 2]))
+        );
+
+        let a = Tensor::new(Some(vec![2, 3, 4, 5]), Shape::new(vec![2, 2]));
+        let b = Tensor::new(Some(vec![6, 7, 8, 9]), Shape::new(vec![2, 2]));
+        let result = einsum("ij,jk->k", &[a, b]);
         assert_eq!(
             result,
             Tensor::new(Some(vec![36, 41, 64, 73]), Shape::new(vec![2, 2]))
