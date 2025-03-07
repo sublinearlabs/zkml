@@ -1,25 +1,20 @@
 use crate::tensor::shape::Shape;
-use crate::tensor::shape_indices::ShapeIndices;
 use crate::tensor::tensor::Tensor;
 use std::collections::{BTreeSet, HashMap};
+use tract_core::internal::tract_itertools::Itertools;
 
-// TODO: add documentation
-fn parse_einsum_instruction(
-    instruction: &str,
-    inputs: &[Tensor<usize>],
-) -> (Shape, Vec<FixedShapeGenerator>) {
-    // partition instruction to get input instruction and output instruction
-    let [input_insn, output_insn]: [&str; 2] = instruction
+fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
+    // split the instruction into input and output sections
+    let [input_insn, output_insn]: [&str; 2] = insn
         .split("->")
         .take(2)
         .collect::<Vec<_>>()
         .try_into()
         .unwrap();
-
-    // get the dimension variable string for each input
+    // get the individual input instructions
     let input_insn = input_insn.split(",").collect::<Vec<_>>();
 
-    // for each dimension variable figure out the concrete shape
+    // Map characters to dimensions
     let mut symbol_dimensions: HashMap<char, usize> = HashMap::new();
     for (inst, input_tensor) in input_insn.iter().zip(inputs.iter()) {
         for (char, dim) in inst.chars().zip(input_tensor.shape.dims.iter()) {
@@ -27,156 +22,106 @@ fn parse_einsum_instruction(
         }
     }
 
-    // free variables represent variables in the output
-    let free_variables: BTreeSet<char> = output_insn.chars().collect();
-    let free_variable_positions: HashMap<char, usize> = free_variables
-        .iter()
-        .enumerate()
-        .map(|(i, v)| (*v, i))
-        .collect();
+    // Output indices (free variables)
+    let output_chars: Vec<char> = output_insn.chars().collect();
+    let output_shape = Shape::new(output_chars.iter().map(|c| symbol_dimensions[c]).collect());
 
-    // TODO: handle empty output section here
-    // generate output shape and empty output tensor
-    let mut output_shape = vec![0; output_insn.len()];
-    for (i, char) in free_variables.iter().enumerate() {
-        output_shape[i] = symbol_dimensions[&char];
-    }
-    let output_shape = Shape::new(output_shape);
-
-    // create input to free variable mappings for all inputs
-    let input_iter_generators = input_insn
-        .iter()
-        .zip(inputs.iter())
-        .map(|(input_str, input_tensor)| {
-            FixedShapeGenerator::from(
-                input_str,
-                &free_variable_positions,
-                input_tensor.shape.clone(),
-            )
-        })
-        .collect::<Vec<_>>();
-
-    (output_shape, input_iter_generators)
-}
-
-// TODO: add documentation
-fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
-    let (output_shape, input_iter_generators) = parse_einsum_instruction(insn, inputs);
-    let mut output_tensor = Tensor::<usize>::new(None, output_shape);
-
-    // next we fill in each value for the output
-    for output_index in output_tensor.shape.index_iter(None) {
-        let input_iters = IndexZip::new(
-            input_iter_generators
-                .iter()
-                .map(|gen| gen.get_iter(&output_index))
-                .collect(),
-        );
-
-        *output_tensor.get_mut(&output_index) = input_iters
-            .map(|indices| {
-                indices
-                    .iter()
-                    .zip(inputs.iter())
-                    .map(|(index, tensor)| tensor.get(index))
-                    .product::<usize>()
-            })
-            .sum::<usize>()
-    }
-
-    // next we need to evaluate each input tensor at the production of their input indices
-    // once we do this we mul the result
-    output_tensor
-}
-
-/// Used to hold free variables to input variable mapping
-/// Can produce a shape indices iterator with fixed values based on mapping
-struct FixedShapeGenerator {
-    // Vec<(source, target)>
-    mapping: Vec<(usize, usize)>,
-    shape: Shape,
-}
-
-impl FixedShapeGenerator {
-    fn from(input_str: &str, free_variable_positions: &HashMap<char, usize>, shape: Shape) -> Self {
-        let mut mapping = vec![];
-        for (target, var) in input_str.chars().enumerate() {
-            if let Some(source) = free_variable_positions.get(&var) {
-                mapping.push((*source, target));
+    // Find summed indices (in inputs, not in output)
+    // all the output characters sorted
+    let output_set: BTreeSet<char> = output_chars.clone().into_iter().collect();
+    // similar to symbol dimension
+    let mut summed_indices: HashMap<char, usize> = HashMap::new();
+    // for each input instr
+    for inst in input_insn.iter() {
+        // for each symbol in any input
+        for c in inst.chars() {
+            // if the output does not contain it then
+            if !output_set.contains(&c) {
+                // push that to the summed indices with their corresponding symbols
+                summed_indices.insert(c, symbol_dimensions[&c]);
             }
         }
-        Self { mapping, shape }
     }
 
-    fn get_iter(&self, source_values: &[usize]) -> ShapeIndices {
-        let fix_insn = self
-            .mapping
+    // build the output tensor
+    let mut output_tensor = Tensor::<usize>::new(None, output_shape);
+
+    // iterate over each output index
+    for output_index in output_tensor.shape.index_iter(None) {
+        // if you index at a given character, you get the current concrete value for that character
+        let mut index_map: HashMap<char, usize> = output_chars
             .iter()
-            .map(|(source, target)| (*target, source_values[*source]))
+            .zip(output_index.iter())
+            .map(|(&c, &v)| (c, v))
             .collect();
-        self.shape.index_iter(Some(fix_insn))
-    }
-}
+        // gives you the symbol for all the indices in the input but not in the output
+        let summed_keys: Vec<char> = summed_indices.keys().copied().collect();
+        // for all the symbols we are supposed to sum over we get their range from (0..max_sym)
+        let summed_ranges: Vec<Vec<usize>> = summed_keys
+            .iter()
+            .map(|c| (0..summed_indices[c]).collect())
+            .collect();
 
-struct IndexZip {
-    iterators: Vec<ShapeIndices>,
-}
+        let value = if summed_keys.is_empty() {
+            // No summation: compute product directly
+            // in this case, there is no value in the input that is not in the output
+            // what does this mean???
+            // output always has values that are in the input, so this must mean input and output
+            // use exactly the same symbols if you push to a set.
+            // evaluate each input tensor at the location describe by the output index
+            // find the product of the result
+            input_insn
+                .iter()
+                .zip(inputs.iter())
+                .map(|(inst, tensor)| {
+                    let indices: Vec<usize> = inst.chars().map(|c| index_map[&c]).collect();
+                    tensor.get(&indices)
+                })
+                .product::<usize>()
+        } else {
+            // Summation required: use combinations
+            // for all the values we are summing over, we find the combination of the range via multi cartesian product
+            let combinations = summed_ranges.into_iter().multi_cartesian_product();
+            combinations
+                .map(|combo| {
+                    // for each combination, recall a combination represents the set of values for no in the output
+                    // index map already contains the fixed values for the free variables
+                    for (&c, &v) in summed_keys.iter().zip(combo.iter()) {
+                        // here we just add the current concrete values
+                        index_map.insert(c, v);
+                    }
+                    // then we go through each input and then get out the appropriate value
+                    // get the tensor value at that point and the multiply all of this
+                    // finally we sum all of this to get our output
+                    input_insn
+                        .iter()
+                        .zip(inputs.iter())
+                        .map(|(inst, tensor)| {
+                            let indices: Vec<usize> = inst.chars().map(|c| index_map[&c]).collect();
+                            tensor.get(&indices)
+                        })
+                        .product::<usize>()
+                })
+                .sum()
+        };
 
-impl IndexZip {
-    fn new(iterators: Vec<ShapeIndices>) -> Self {
-        Self { iterators }
+        // store the output value
+        *output_tensor.get_mut(&output_index) = value;
     }
-}
 
-impl Iterator for IndexZip {
-    type Item = Vec<Vec<usize>>;
-    fn next(&mut self) -> Option<Self::Item> {
-        self.iterators
-            .iter_mut()
-            .map(|i| i.next())
-            .collect::<Option<Vec<_>>>()
-    }
+    output_tensor
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::supported_ops::einsum::{einsum, FixedShapeGenerator};
+    use crate::supported_ops::einsum::einsum;
     use crate::tensor::shape::Shape;
     use crate::tensor::tensor::Tensor;
     use std::collections::HashMap;
 
     #[test]
-    fn test_fixed_shape_generator() {
-        // assume einsum instruction ij,jk->ik
-        // free variables should be [i->0, k->1]
-        // for the first input ij we expect the mapping [(0,0)]
-        // for the second input jk we expect the mapping [(1,1)]
-
-        let free_variables: HashMap<char, usize> = vec![('i', 0), ('k', 1)].into_iter().collect();
-        let mapping_1 =
-            FixedShapeGenerator::from("ij", &free_variables, Shape::new(vec![1])).mapping;
-        assert_eq!(mapping_1, vec![(0, 0)]);
-        let mapping_2 =
-            FixedShapeGenerator::from("jk", &free_variables, Shape::new(vec![1])).mapping;
-        assert_eq!(mapping_2, vec![(1, 1)]);
-    }
-
-    #[test]
-    fn test_fixed_shape_iteration() {
-        // assume we have some input string ijk
-        // and we have some free variable j that comes from index 0 of source
-        let free_variables: HashMap<char, usize> = vec![('j', 0)].into_iter().collect();
-        let shape_iter_generator =
-            FixedShapeGenerator::from("ijk", &free_variables, Shape::new(vec![2, 5, 1]));
-        assert_eq!(shape_iter_generator.mapping, &[(0, 1)]);
-        // this should create a generator that fixes j to 3
-        let iter = shape_iter_generator.get_iter(&[3]);
-        let indices = iter.collect::<Vec<_>>();
-        assert_eq!(indices, vec![vec![0, 3, 0], vec![1, 3, 0]]);
-    }
-
-    #[test]
     fn test_einsum() {
+        // Original test: Matrix multiplication
         let a = Tensor::new(Some(vec![2, 3, 4, 5]), Shape::new(vec![2, 2]));
         let b = Tensor::new(Some(vec![6, 7, 8, 9]), Shape::new(vec![2, 2]));
         let result = einsum("ij,jk->ik", &[a, b]);
@@ -185,12 +130,65 @@ mod tests {
             Tensor::new(Some(vec![36, 41, 64, 73]), Shape::new(vec![2, 2]))
         );
 
+        // Original test: Contraction to a vector
         let a = Tensor::new(Some(vec![2, 3, 4, 5]), Shape::new(vec![2, 2]));
         let b = Tensor::new(Some(vec![6, 7, 8, 9]), Shape::new(vec![2, 2]));
         let result = einsum("ij,jk->k", &[a, b]);
         assert_eq!(
             result,
-            Tensor::new(Some(vec![36, 41, 64, 73]), Shape::new(vec![2, 2]))
+            Tensor::new(Some(vec![100, 114]), Shape::new(vec![2]))
+        );
+
+        // New test 1: Element-wise multiplication of two vectors
+        let a = Tensor::new(Some(vec![1, 2, 3]), Shape::new(vec![3]));
+        let b = Tensor::new(Some(vec![4, 5, 6]), Shape::new(vec![3]));
+        let result = einsum("i,i->i", &[a, b]);
+        assert_eq!(
+            result,
+            Tensor::new(Some(vec![4, 10, 18]), Shape::new(vec![3]))
+        );
+
+        // New test 2: Summing over rows and columns of a matrix
+        let a = Tensor::new(Some(vec![1, 2, 3, 4, 5, 6]), Shape::new(vec![2, 3]));
+        let result = einsum("ij->i", &[a]);
+        assert_eq!(result, Tensor::new(Some(vec![6, 15]), Shape::new(vec![2])));
+        let a = Tensor::new(Some(vec![1, 2, 3, 4, 5, 6]), Shape::new(vec![2, 3]));
+        let result = einsum("ij->j", &[a]);
+        assert_eq!(
+            result,
+            Tensor::new(Some(vec![5, 7, 9]), Shape::new(vec![3]))
+        );
+
+        // New test 3: Outer product of two vectors
+        let a = Tensor::new(Some(vec![1, 2, 3]), Shape::new(vec![3]));
+        let b = Tensor::new(Some(vec![4, 5]), Shape::new(vec![2]));
+        let result = einsum("i,j->ij", &[a, b]);
+        assert_eq!(
+            result,
+            Tensor::new(Some(vec![4, 5, 8, 10, 12, 15]), Shape::new(vec![3, 2]))
+        );
+
+        // New test 4: Outer product of three vectors
+        let a = Tensor::new(Some(vec![1, 2]), Shape::new(vec![2]));
+        let b = Tensor::new(Some(vec![3, 4]), Shape::new(vec![2]));
+        let c = Tensor::new(Some(vec![5, 6]), Shape::new(vec![2]));
+        let result = einsum("i,j,k->ijk", &[a, b, c]);
+        assert_eq!(
+            result,
+            Tensor::new(
+                Some(vec![15, 18, 20, 24, 30, 36, 40, 48]),
+                Shape::new(vec![2, 2, 2])
+            )
+        );
+
+        // New test 5: Contraction of three matrices
+        let a = Tensor::new(Some(vec![1, 2, 3, 4]), Shape::new(vec![2, 2]));
+        let b = Tensor::new(Some(vec![5, 6, 7, 8]), Shape::new(vec![2, 2]));
+        let c = Tensor::new(Some(vec![9, 10, 11, 12]), Shape::new(vec![2, 2]));
+        let result = einsum("ij,jk,kl->il", &[a, b, c]);
+        assert_eq!(
+            result,
+            Tensor::new(Some(vec![413, 454, 937, 1030]), Shape::new(vec![2, 2]))
         );
     }
 }
