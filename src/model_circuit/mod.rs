@@ -147,13 +147,15 @@
 use expander_compiler::{
     circuit::ir::common::IrConfig,
     declare_circuit,
-    frontend::{internal::DumpLoadTwoVariables, Config, Define, Variable},
+    field::M31,
+    frontend::{internal::DumpLoadTwoVariables, Config, Define, M31Config, Variable},
 };
 
+#[derive(Debug, Clone)]
 struct ModelParameters {
     input_len: usize,
     output_len: usize,
-    weights: Vec<Variable>,
+    weights: Vec<M31>,
 }
 
 declare_circuit!(_ModelCircuit {
@@ -167,7 +169,7 @@ type ModelCircuit = _ModelCircuit<Variable>;
 impl ModelCircuit {
     type Params = ModelParameters;
 
-    type Assignment = _ModelCircuit<Variable>;
+    type Assignment = _ModelCircuit<M31>;
 
     fn new_circuit(params: &Self::Params) -> Self {
         let mut new_circuit = Self::default();
@@ -185,18 +187,18 @@ impl ModelCircuit {
         new_circuit
     }
 
-    fn new_assignment(params: Self::Params) -> Self::Assignment {
+    fn new_assignment(params: &Self::Params) -> Self::Assignment {
         let mut new_assignment = Self::Assignment::default();
 
         new_assignment
             .input
-            .resize(params.input_len, Variable::default());
+            .resize(params.input_len, M31::default());
         new_assignment
             .output
-            .resize(params.output_len, Variable::default());
+            .resize(params.output_len, M31::default());
         new_assignment
             .weights
-            .resize(params.weights.len(), Variable::default());
+            .resize(params.weights.len(), M31::default());
 
         for i in 0..params.weights.len() {
             new_assignment.weights[i] = params.weights[i];
@@ -213,26 +215,13 @@ impl<C: Config> Define<C> for ModelCircuit {
     }
 }
 
-// impl <T>DumpLoadTwoVariables<T> for ModelCircuit{
-//     fn dump_into(&self, vars: &mut Vec<T>, public_vars: &mut Vec<T>) {
-//         todo!()
-//     }
-
-//     fn load_from(&mut self, vars: &mut &[T], public_vars: &mut &[T]) {
-//         todo!()
-//     }
-
-//     fn num_vars(&self) -> (usize, usize) {
-//         todo!()
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
 
     use expander_compiler::{
         circuit::ir::common::IrConfig,
         compile::CompileOptions,
+        field::M31,
         frontend::{compile, CompileResult, M31Config, Variable},
     };
 
@@ -243,7 +232,7 @@ mod tests {
         let params = ModelParameters {
             input_len: 2,
             output_len: 1,
-            weights: vec![Variable::from(3)],
+            weights: vec![M31::from(5)],
         };
 
         let compiled_result: CompileResult<M31Config> = compile(
@@ -252,7 +241,7 @@ mod tests {
         )
         .unwrap();
 
-        let assignment = ModelCircuit::new_circuit(&params);
+        let assignment = ModelCircuit::new_assignment(&params);
 
         let witness = compiled_result
             .witness_solver
