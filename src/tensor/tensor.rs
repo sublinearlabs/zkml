@@ -4,7 +4,7 @@ use clap::Parser;
 #[derive(Debug, PartialEq)]
 /// Flat representation of an n-dimensional tensor
 pub(crate) struct Tensor<T> {
-    data: Vec<T>,
+    pub(crate) data: Vec<T>,
     pub(crate) shape: Shape,
 }
 

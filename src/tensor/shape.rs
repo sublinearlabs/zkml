@@ -1,6 +1,6 @@
 use crate::tensor::shape_indices::ShapeIndices;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 /// Represents the shape of a tensor
 pub(crate) struct Shape {
     pub(crate) dims: Vec<usize>,

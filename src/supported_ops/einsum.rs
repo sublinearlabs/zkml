@@ -4,6 +4,7 @@ use expander_compiler::frontend::{Config, RootAPI, Variable};
 use std::collections::{BTreeSet, HashMap};
 use tract_core::internal::tract_itertools::Itertools;
 
+#[derive(Clone, Debug, Default)]
 struct EinSum {
     input_str: Vec<Vec<char>>,
     output_str: Vec<char>,
@@ -207,9 +208,13 @@ fn prod_vars<Builder: RootAPI<T>, T: Config>(
 
 #[cfg(test)]
 mod tests {
-    use crate::supported_ops::einsum::einsum;
+    use crate::supported_ops::einsum::{einsum, EinSum};
     use crate::tensor::shape::Shape;
     use crate::tensor::tensor::Tensor;
+    use expander_compiler::compile::CompileOptions;
+    use expander_compiler::declare_circuit;
+    use expander_compiler::field::M31;
+    use expander_compiler::frontend::{compile, Define, M31Config, RootAPI, Variable};
 
     #[test]
     fn test_einsum() {
@@ -282,5 +287,57 @@ mod tests {
             result,
             Tensor::new(Some(vec![413, 454, 937, 1030]), Shape::new(vec![2, 2]))
         );
+    }
+
+    #[test]
+    fn test_einsum_circuit() {
+        // matmul circuit
+        declare_circuit!(EinsumCircuit {
+            a: [Variable; 4],
+            b: [Variable; 4],
+            target: [Variable; 4],
+            einsum_params: EinSum
+        });
+
+        impl Define<M31Config> for EinsumCircuit<Variable> {
+            fn define<Builder: RootAPI<M31Config>>(&self, api: &mut Builder) {
+                let a_tensor = Tensor::new(Some(self.a.to_vec()), Shape::new(vec![2, 2]));
+                let b_tensor = Tensor::new(Some(self.b.to_vec()), Shape::new(vec![2, 2]));
+                let result = self
+                    .einsum_params
+                    .create_circuit(api, &[a_tensor, b_tensor]);
+                for (i, v) in self.target.iter().enumerate() {
+                    api.assert_is_equal(result.data[i], v);
+                }
+            }
+        }
+
+        impl EinsumCircuit<Variable> {
+            fn new(params: EinSum) -> Self {
+                let mut circuit = Self::default();
+                circuit.einsum_params = params;
+                circuit
+            }
+        }
+
+        let params = EinSum::new(
+            "ij,jk->ik",
+            &[Shape::new(vec![2, 2]), Shape::new(vec![2, 2])],
+        );
+
+        let compile_result =
+            compile(&EinsumCircuit::new(params), CompileOptions::default()).unwrap();
+        let assignment = EinsumCircuit::<M31> {
+            a: [M31::from(2), M31::from(3), M31::from(4), M31::from(5)],
+            b: [M31::from(6), M31::from(7), M31::from(8), M31::from(9)],
+            target: [M31::from(36), M31::from(41), M31::from(64), M31::from(73)],
+            einsum_params: EinSum::default(),
+        };
+        let witness = compile_result
+            .witness_solver
+            .solve_witness(&assignment)
+            .unwrap();
+        let run_result = compile_result.layered_circuit.run(&witness);
+        assert!(run_result.iter().all(|v| *v));
     }
 }
