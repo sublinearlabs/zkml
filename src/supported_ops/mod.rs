@@ -13,6 +13,7 @@ use tract_core::{
 
 use crate::tensor::shape::Shape;
 
+mod einsum;
 mod load_onnx;
 
 #[derive(Debug, Clone)]
@@ -53,19 +54,19 @@ struct Constant {
 }
 
 #[derive(Debug, Clone)]
-struct Input {
-    id: usize,
-    info: OpInfo,
-    name: String,
-}
-
-#[derive(Debug, Clone)]
-struct Einsum {
+pub(crate) struct Einsum {
     name: String,
     id: usize,
     instruction: String,
     input_count: usize,
     output_count: usize,
+}
+
+#[derive(Debug, Clone)]
+struct Input {
+    id: usize,
+    info: OpInfo,
+    name: String,
 }
 
 #[derive(Debug, Clone)]

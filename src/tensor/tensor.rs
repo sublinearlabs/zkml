@@ -1,16 +1,18 @@
 use crate::tensor::shape::Shape;
+use clap::Parser;
 
+#[derive(Debug, PartialEq)]
 /// Flat representation of an n-dimensional tensor
-struct Tensor<T> {
-    data: Vec<T>,
-    shape: Shape,
+pub(crate) struct Tensor<T> {
+    pub(crate) data: Vec<T>,
+    pub(crate) shape: Shape,
 }
 
 impl<T: Default + Clone> Tensor<T> {
     /// Instantiates a new Tensor
     /// ensures the size of data matches the shape
     /// if no data, performs default T allocation of correct size
-    fn new(data: Option<Vec<T>>, shape: Shape) -> Self {
+    pub(crate) fn new(data: Option<Vec<T>>, shape: Shape) -> Self {
         let data = if let Some(data) = data {
             assert!(data.len() == shape.volume());
             data
@@ -22,12 +24,12 @@ impl<T: Default + Clone> Tensor<T> {
     }
 
     /// Returns the value at the given multi-dimensional tensor location
-    fn get(&self, index: &[usize]) -> &T {
+    pub(crate) fn get(&self, index: &[usize]) -> &T {
         &self.data[self.shape.flat_index(index)]
     }
 
     /// Gives you mutable access to a certain location in a tensor
-    fn get_mut(&mut self, index: &[usize]) -> &mut T {
+    pub(crate) fn get_mut(&mut self, index: &[usize]) -> &mut T {
         &mut self.data[self.shape.flat_index(index)]
     }
 }

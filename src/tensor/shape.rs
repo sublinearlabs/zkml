@@ -1,11 +1,13 @@
 use crate::tensor::shape_indices::ShapeIndices;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Default)]
 /// Represents the shape of a tensor
 pub(crate) struct Shape {
     pub(crate) dims: Vec<usize>,
     strides: Vec<usize>,
 }
+
+// TODO: deal with empty shape
 
 impl Shape {
     /// Instantiates a new shape (computes stride values at this point)
