@@ -1,3 +1,5 @@
+#![feature(inherent_associated_types)]
+
 mod model_circuit;
 mod quantization;
 mod supported_ops;
