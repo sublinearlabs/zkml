@@ -24,12 +24,12 @@ impl<T: Default + Clone> Tensor<T> {
     }
 
     /// Returns the value at the given multi-dimensional tensor location
-    fn get(&self, index: &[usize]) -> &T {
+    pub(crate) fn get(&self, index: &[usize]) -> &T {
         &self.data[self.shape.flat_index(index)]
     }
 
     /// Gives you mutable access to a certain location in a tensor
-    fn get_mut(&mut self, index: &[usize]) -> &mut T {
+    pub(crate) fn get_mut(&mut self, index: &[usize]) -> &mut T {
         &mut self.data[self.shape.flat_index(index)]
     }
 }

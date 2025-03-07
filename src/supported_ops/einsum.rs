@@ -1,9 +1,11 @@
 use crate::tensor::shape::Shape;
+use crate::tensor::shape_indices::ShapeIndices;
 use crate::tensor::tensor::Tensor;
 use std::collections::{BTreeSet, HashMap};
+use tract_core::ndarray::indices;
 
 // TODO: add documentation
-fn einsum<T: Clone + Default>(insn: &str, inputs: &[Tensor<T>]) -> Tensor<T> {
+fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
     // assumes the instruction string is valid
     // TODO: deal with unwrap
     let [input_insn, output_insn]: [&str; 2] = insn
@@ -52,7 +54,7 @@ fn einsum<T: Clone + Default>(insn: &str, inputs: &[Tensor<T>]) -> Tensor<T> {
     }
     let output_shape = Shape::new(output_shape);
 
-    let output_tensor = Tensor::<T>::new(None, output_shape.clone());
+    let mut output_tensor = Tensor::<usize>::new(None, output_shape.clone());
 
     // output shape is the same as free variables
     // I'd like a map from free variable to the concrete output
@@ -70,15 +72,48 @@ fn einsum<T: Clone + Default>(insn: &str, inputs: &[Tensor<T>]) -> Tensor<T> {
             fixed_input_shapes.push(fix_insn);
         }
 
-        // this should be equal to the summation of products
-        // we need to get the new input shapes (after fixed)
-        // how do we map it??
-        // let us assume I have (input_insn, input_shape)
-        // I can also assume I have (output_insn, output_values)
-        // output_tensor[output_shape.flat_index(&output_index)] = todo!();
+        let mut input_iters = IndexZip::new(
+            fixed_input_shapes
+                .into_iter()
+                .zip(inputs.iter())
+                .map(|(fix_insn, tensor)| tensor.shape.index_iter(Some(fix_insn)))
+                .collect::<Vec<_>>(),
+        );
+
+        *output_tensor.get_mut(&output_index) = input_iters
+            .map(|indices| {
+                indices
+                    .iter()
+                    .zip(inputs.iter())
+                    .map(|(index, tensor)| tensor.get(index))
+                    .product::<usize>()
+            })
+            .sum::<usize>()
     }
 
+    // next we need to evaluate each input tensor at the production of their input indices
+    // once we do this we mul the result
     output_tensor
+}
+
+struct IndexZip {
+    iterators: Vec<ShapeIndices>,
+}
+
+impl IndexZip {
+    fn new(iterators: Vec<ShapeIndices>) -> Self {
+        Self { iterators }
+    }
+}
+
+impl Iterator for IndexZip {
+    type Item = Vec<Vec<usize>>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iterators
+            .iter_mut()
+            .map(|i| i.next())
+            .collect::<Option<Vec<_>>>()
+    }
 }
 
 #[cfg(test)]
@@ -94,7 +129,7 @@ mod tests {
         let result = einsum("ij,jk->ik", &[a, b]);
         assert_eq!(
             result,
-            Tensor::new(Some(vec![46, 41, 64, 77]), Shape::new(vec![2, 2]))
+            Tensor::new(Some(vec![36, 41, 64, 73]), Shape::new(vec![2, 2]))
         );
     }
 }
