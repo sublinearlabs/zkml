@@ -10,10 +10,12 @@ use tract_core::{
     },
     prelude::*,
 };
+use crate::supported_ops::einsum::Einsum;
 
 use crate::tensor::shape::Shape;
 
 mod load_onnx;
+mod einsum;
 
 #[derive(Debug, Clone)]
 struct OpInfo {
@@ -57,15 +59,6 @@ struct Input {
     id: usize,
     info: OpInfo,
     name: String,
-}
-
-#[derive(Debug, Clone)]
-struct Einsum {
-    name: String,
-    id: usize,
-    instruction: String,
-    input_count: usize,
-    output_count: usize,
 }
 
 #[derive(Debug, Clone)]
