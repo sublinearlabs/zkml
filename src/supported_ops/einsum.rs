@@ -3,6 +3,60 @@ use crate::tensor::tensor::Tensor;
 use std::collections::{BTreeSet, HashMap};
 use tract_core::internal::tract_itertools::Itertools;
 
+struct EinSum {
+    input_str: Vec<Vec<char>>,
+    output_str: Vec<char>,
+    symbol_dimensions: HashMap<char, usize>,
+    summed_indices: HashMap<char, usize>,
+    output_shape: Shape,
+}
+
+impl EinSum {
+    fn new(instruction: &str, inputs: &[Tensor<usize>]) -> Self {
+        let [input_insn, output_insn]: [&str; 2] = instruction
+            .split("->")
+            .take(2)
+            .collect_vec()
+            .try_into()
+            .unwrap();
+
+        let input_insn = input_insn
+            .split(",")
+            .map(|s| s.chars().collect_vec())
+            .collect_vec();
+        let output_insn = output_insn.chars().collect_vec();
+
+        // map each character index to its dimension size
+        let mut symbol_dimensions = HashMap::new();
+        for (inst, tensor) in input_insn.iter().zip(inputs.iter()) {
+            for (&c, &dim) in inst.iter().zip(tensor.shape.dims.iter()) {
+                symbol_dimensions.insert(c, dim);
+            }
+        }
+
+        // determine the output shape
+        let output_shape = Shape::new(output_insn.iter().map(|c| symbol_dimensions[c]).collect());
+
+        // get the indices to sum over
+        let mut summed_indices: HashMap<char, usize> = HashMap::new();
+        for inst in input_insn.iter() {
+            for c in inst {
+                if !output_insn.contains(&c) {
+                    summed_indices.insert(*c, symbol_dimensions[&c]);
+                }
+            }
+        }
+
+        Self {
+            input_str: input_insn,
+            output_str: output_insn,
+            symbol_dimensions,
+            summed_indices,
+            output_shape,
+        }
+    }
+}
+
 fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
     // split the instruction into input and output sections
     let [input_insn, output_insn]: [&str; 2] = insn
