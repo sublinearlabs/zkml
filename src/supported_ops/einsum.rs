@@ -20,6 +20,11 @@ impl FixedShapeGenerator {
         }
         Self { mapping, shape }
     }
+
+    fn get_iter(&self, source_values: &[usize]) -> ShapeIndices {
+        let fix_insn = self.mapping.iter().map(|(source, target)| (*target, source_values[*source])).collect();
+        self.shape.index_iter(Some(fix_insn))
+    }
 }
 
 // TODO: add documentation
@@ -154,6 +159,19 @@ mod tests {
         let mapping_2 =
             FixedShapeGenerator::from("jk", &free_variables, Shape::new(vec![1])).mapping;
         assert_eq!(mapping_2, vec![(1, 1)]);
+    }
+
+    #[test]
+    fn test_fixed_shape_iteration() {
+        // assume we have some input string ijk
+        // and we have some free variable j that comes from index 0 of source
+        let free_variables: HashMap<char, usize> = vec![('j', 0)].into_iter().collect();
+        let shape_iter_generator = FixedShapeGenerator::from("ijk", &free_variables, Shape::new(vec![2, 5, 1]));
+        assert_eq!(shape_iter_generator.mapping, &[(0, 1)]);
+        // this should create a generator that fixes j to 3
+        let iter = shape_iter_generator.get_iter(&[3]);
+        let indices = iter.collect::<Vec<_>>();
+        assert_eq!(indices, vec![vec![0, 3, 0], vec![1, 3, 0]]);
     }
 
     #[test]
