@@ -31,6 +31,7 @@ impl<T: Default + Clone> Tensor<T> {
 }
 
 /// Represents the shape of a tensor
+#[derive(Debug, Clone)]
 pub(crate) struct Shape {
     pub(crate) dims: Vec<usize>,
     pub(crate) strides: Vec<usize>,
@@ -38,7 +39,7 @@ pub(crate) struct Shape {
 
 impl Shape {
     /// Instantiates a new shape (computes stride values at this point)
-    fn new(dims: Vec<usize>) -> Self {
+    pub(crate) fn new(dims: Vec<usize>) -> Self {
         Self {
             strides: compute_strides(&dims),
             dims,
@@ -46,7 +47,7 @@ impl Shape {
     }
 
     /// Compute the number of elements in the tensor
-    fn volume(&self) -> usize {
+    pub(crate) fn volume(&self) -> usize {
         self.dims.iter().product()
     }
 
