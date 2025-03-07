@@ -2,10 +2,10 @@ use std::path::PathBuf;
 
 use tract_onnx::prelude::*;
 
-use super::parse_tract_op;
+use super::{parse_tract_op, SupportedOps};
 
-fn load_onnx(path: PathBuf) {
-    let model = tract_onnx::onnx()
+pub(crate) fn load_onnx(path: PathBuf) -> Graph<TypedFact, Box<dyn TypedOp>> {
+    tract_onnx::onnx()
         .model_for_path(path)
         .unwrap()
         .with_input_fact(0, InferenceFact::dt_shape(f32::datum_type(), tvec!(1, 1)))
@@ -13,26 +13,33 @@ fn load_onnx(path: PathBuf) {
         .into_typed()
         .unwrap()
         .into_decluttered()
-        .unwrap();
+        .unwrap()
+}
 
+pub(crate) fn model_graph_to_ir(
+    model_graph: &Graph<TypedFact, Box<dyn TypedOp>>,
+) -> Vec<SupportedOps> {
     let mut last_input_index = 0;
     let mut ir_info = vec![];
 
-    for node in model.nodes() {
+    for node in model_graph.nodes() {
         let op = node.op.clone().into();
         let node_info = parse_tract_op(op, node.id, &mut last_input_index);
         dbg!(&node_info);
         ir_info.push(node_info);
     }
+
+    ir_info
 }
 
 #[cfg(test)]
 mod test {
 
-    use super::load_onnx;
+    use super::{load_onnx, model_graph_to_ir};
 
     #[test]
     fn test_load_onnx() {
-        load_onnx("models/test_onnx_model.onnx".into());
+        let model_graph = load_onnx("models/test_onnx_model.onnx".into());
+        let _ = model_graph_to_ir(&model_graph);
     }
 }

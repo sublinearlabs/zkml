@@ -13,7 +13,7 @@ use tract_core::{
 
 use crate::tensor::shape::Shape;
 
-mod load_onnx;
+pub(crate) mod load_onnx;
 
 #[derive(Debug, Clone)]
 struct OpInfo {
@@ -39,13 +39,13 @@ pub(crate) enum SupportedOps {
 }
 
 #[derive(Debug, Clone)]
-struct SupportedAdd {
-    id: usize,
-    name: String,
+pub(crate) struct SupportedAdd {
+    pub(crate) id: usize,
+    pub(crate) name: String,
 }
 
 #[derive(Debug, Clone)]
-struct Constant {
+pub(crate) struct Constant {
     id: usize,
     info: OpInfo,
     name: String,
@@ -53,14 +53,14 @@ struct Constant {
 }
 
 #[derive(Debug, Clone)]
-struct Input {
+pub(crate) struct Input {
     id: usize,
     info: OpInfo,
     name: String,
 }
 
 #[derive(Debug, Clone)]
-struct Einsum {
+pub(crate) struct Einsum {
     name: String,
     id: usize,
     instruction: String,

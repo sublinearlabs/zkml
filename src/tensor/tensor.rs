@@ -1,7 +1,8 @@
 use crate::tensor::shape::Shape;
 
 /// Flat representation of an n-dimensional tensor
-struct Tensor<T> {
+#[derive(Debug, Clone)]
+pub(crate) struct Tensor<T> {
     data: Vec<T>,
     shape: Shape,
 }
