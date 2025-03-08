@@ -57,10 +57,7 @@ impl SupportedOps {
                 let lhs = history.get(&supported_add.lhs_id).unwrap();
                 let rhs = history.get(&supported_add.rhs_id).unwrap();
 
-                api.assert_is_equal(
-                    C::CircuitField::from(lhs.shape.volume() as u32),
-                    C::CircuitField::from(rhs.shape.volume() as u32),
-                );
+                assert_eq!(lhs.shape.volume(), rhs.shape.volume());
 
                 let mut res_data = vec![];
 
