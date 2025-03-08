@@ -25,7 +25,6 @@ pub(crate) fn model_graph_to_ir(
     for node in model_graph.nodes() {
         let op = node.op.clone().into();
         let node_info = parse_tract_op(op, node.id, &mut last_input_index);
-        dbg!(&node_info);
         ir_info.push(node_info);
     }
 

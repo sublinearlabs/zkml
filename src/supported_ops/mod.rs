@@ -1,7 +1,6 @@
-use expander_compiler::{
-    field::FieldArith,
-    frontend::{Config, RootAPI},
-};
+use std::collections::HashMap;
+
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 use tract_core::{
     internal::DimLike,
     model::ShapeFact,
@@ -49,12 +48,17 @@ impl SupportedOps {
     pub(crate) fn create_circuit<C: Config, Builder: RootAPI<C>>(
         &self,
         api: &mut Builder,
-    ) -> Tensor<C::CircuitField> {
-        dbg!(&self);
+        history: &HashMap<usize, Vec<Variable>>,
+        input_value: &Vec<Variable>,
+    ) -> Tensor<Variable> {
         match self {
             SupportedOps::Add(supported_add) => {
-                dbg!("Trying to create circuit");
-                Tensor::new(Some(vec![C::CircuitField::zero()]), Shape::new(vec![1]))
+                let c = api.add(
+                    input_value[supported_add.input_a_id],
+                    input_value[supported_add.input_b_id],
+                );
+                // TODO: calculate appropriate shape
+                Tensor::new(Some(vec![c]), Shape::new(vec![1]))
             }
             SupportedOps::Constant(constant) => todo!(),
             SupportedOps::Input(input) => todo!(),
@@ -78,6 +82,8 @@ impl SupportedOps {
 pub(crate) struct SupportedAdd {
     pub(crate) id: usize,
     pub(crate) name: String,
+    pub(crate) input_a_id: usize,
+    pub(crate) input_b_id: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -199,6 +205,10 @@ pub(crate) fn parse_tract_op(
                 TractBinaryOps::Add(add) => SupportedOps::Add(SupportedAdd {
                     id: op_id,
                     name: add.name().to_string(),
+                    // todo!(): FIX
+                    // Fetch info from tract
+                    input_a_id: 0,
+                    input_b_id: 1,
                 }),
                 _ => SupportedOps::Unknown,
             }
