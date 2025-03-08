@@ -1,7 +1,7 @@
 use crate::ir::Ops;
 
 /// Circuit friendly representation of some ML computational graph
-struct IR {
+pub(crate) struct IR {
     /// number of flattened inputs to some model
     input_count: usize,
     /// contains all constants in the computational graph
@@ -11,4 +11,21 @@ struct IR {
     output_ids: Vec<usize>,
     /// Flattened representation of the computational graph
     ops: Vec<Ops>,
+}
+
+impl IR {
+    /// Instantiate IR
+    pub(crate) fn new(
+        input_count: usize,
+        constants: Vec<f32>,
+        output_ids: Vec<usize>,
+        ops: Vec<Ops>,
+    ) -> Self {
+        IR {
+            input_count,
+            constants,
+            output_ids,
+            ops,
+        }
+    }
 }
