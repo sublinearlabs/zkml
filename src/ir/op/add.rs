@@ -1,6 +1,7 @@
 use crate::tensor::tensor::Tensor;
 use expander_compiler::frontend::{Config, RootAPI, Variable};
 use std::collections::HashMap;
+use tract_core::internal::tract_itertools::Itertools;
 
 #[derive(Debug, Clone)]
 pub(crate) struct AddOp {
@@ -15,6 +16,18 @@ impl AddOp {
         api: &mut Builder,
         history: &HashMap<usize, Tensor<Variable>>,
     ) -> Tensor<Variable> {
-        todo!()
+        let lhs = history.get(&self.lhs_id).unwrap();
+        let rhs = history.get(&self.rhs_id).unwrap();
+
+        assert_eq!(lhs.shape.volume(), rhs.shape.volume());
+
+        let sum = lhs
+            .data
+            .iter()
+            .zip(rhs.data.iter())
+            .map(|(a, b)| api.add(a, b))
+            .collect_vec();
+
+        Tensor::new(Some(sum), lhs.shape.clone())
     }
 }

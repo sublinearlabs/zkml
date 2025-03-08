@@ -146,7 +146,7 @@ mod tests {
                     id: 1,
                     tensor_type: ViewType::Weights,
                     start_index: 0,
-                    shape: Shape::new(vec![1, 1])
+                    shape: Shape::new(vec![1, 1]),
                 }),
                 NodeOp::Add(AddOp {
                     id: 5,
