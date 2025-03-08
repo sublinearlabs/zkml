@@ -19,6 +19,7 @@ use crate::tensor::{
     tensor::Tensor,
 };
 
+mod einsum;
 pub(crate) mod load_onnx;
 
 #[derive(Debug, Clone)]
@@ -108,6 +109,13 @@ pub(crate) struct Einsum {
     instruction: String,
     input_count: usize,
     output_count: usize,
+}
+
+#[derive(Debug, Clone)]
+struct Input {
+    id: usize,
+    info: OpInfo,
+    name: String,
 }
 
 #[derive(Debug, Clone)]

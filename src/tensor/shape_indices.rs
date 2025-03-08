@@ -1,5 +1,6 @@
 use crate::tensor::shape::Shape;
 
+#[derive(Clone)]
 /// Holds state for shape index iteration
 pub(crate) struct ShapeIndices {
     pub(crate) shape: Shape,
