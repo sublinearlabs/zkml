@@ -36,6 +36,7 @@ impl IR {
         }
     }
 
+    /// Returns the IR constants in quantized form (so we can perform operations in the field)
     pub(crate) fn quantize_constants<const N: u8>(&self) -> Vec<BN254> {
         let quantizer = Quantizer::<N>{};
         self.constants.iter().map(|c| quantizer.quantize(*c)).collect_vec()
