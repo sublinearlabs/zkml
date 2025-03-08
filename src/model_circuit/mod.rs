@@ -92,7 +92,7 @@ impl<C: Config> Define<C> for ModelCircuit {
         let mut history: HashMap<usize, Tensor<Variable>> = HashMap::new();
 
         for op in &self.ops {
-            let circuit_eval_result = op.create_circuit(api, &history, &self.input);
+            let circuit_eval_result = op.create_circuit(api, &history, &self.input, &self.weights);
             history.insert(op.id(), circuit_eval_result);
         }
 

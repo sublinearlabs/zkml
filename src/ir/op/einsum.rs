@@ -11,6 +11,16 @@ pub(crate) struct EinsumOp {
     pub(crate) instruction: String,
 }
 
+impl EinsumOp {
+    fn create_circuit<C: Config, Builder: RootAPI<C>>(
+        &self,
+        api: &mut Builder,
+        history: &HashMap<usize, Tensor<Variable>>,
+    ) -> Tensor<Variable> {
+        todo!()
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub(crate) struct EinsumParams {
     input_str: Vec<Vec<char>>,
