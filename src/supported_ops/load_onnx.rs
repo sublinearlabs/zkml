@@ -32,7 +32,7 @@ pub(crate) fn model_graph_to_ir(
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
 
     use super::{load_onnx, model_graph_to_ir};
 

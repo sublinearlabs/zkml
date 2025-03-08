@@ -3734,7 +3734,7 @@ dependencies = [
 name = "zkml"
 version = "0.1.0"
 dependencies = [
- "clap",
+ "circuit-std-rs",
  "expander_compiler",
  "rand 0.9.0",
  "tract-core",

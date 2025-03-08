@@ -112,13 +112,6 @@ pub(crate) struct Einsum {
 }
 
 #[derive(Debug, Clone)]
-struct Input {
-    id: usize,
-    info: OpInfo,
-    name: String,
-}
-
-#[derive(Debug, Clone)]
 pub enum TractOps {
     Input(TypedSource),
     Constant(Const),

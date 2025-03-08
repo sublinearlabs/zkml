@@ -1,5 +1,4 @@
 use crate::tensor::shape::Shape;
-use clap::Parser;
 
 #[derive(Debug, PartialEq)]
 /// Flat representation of an n-dimensional tensor
