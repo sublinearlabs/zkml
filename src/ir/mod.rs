@@ -1,7 +1,7 @@
-use expander_compiler::field::BN254;
-use tract_core::internal::tract_itertools::Itertools;
 use crate::ir::op::NodeOp;
 use crate::quantization::quantizer::Quantizer;
+use expander_compiler::field::BN254;
+use tract_core::internal::tract_itertools::Itertools;
 
 pub(crate) mod load_onnx;
 pub(crate) mod op;
@@ -10,14 +10,14 @@ pub(crate) mod op;
 /// Circuit friendly representation of some ML computational graph
 pub(crate) struct IR {
     /// number of flattened inputs to some model
-    input_count: usize,
+    pub(crate) input_count: usize,
     /// contains all constants in the computational graph
     /// this includes weights, bias, ...
     constants: Vec<f32>,
     /// node id's for output nodes
-    output_ids: Vec<usize>,
+    pub(crate) output_ids: Vec<usize>,
     /// Flattened representation of the computational graph
-    ops: Vec<NodeOp>,
+    pub(crate) ops: Vec<NodeOp>,
 }
 
 impl IR {
@@ -38,7 +38,10 @@ impl IR {
 
     /// Returns the IR constants in quantized form (so we can perform operations in the field)
     pub(crate) fn quantize_constants<const N: u8>(&self) -> Vec<BN254> {
-        let quantizer = Quantizer::<N>{};
-        self.constants.iter().map(|c| quantizer.quantize(*c)).collect_vec()
+        let quantizer = Quantizer::<N> {};
+        self.constants
+            .iter()
+            .map(|c| quantizer.quantize(*c))
+            .collect_vec()
     }
 }

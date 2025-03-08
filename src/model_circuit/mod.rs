@@ -10,15 +10,15 @@ use expander_compiler::{
 use crate::tensor::tensor::Tensor;
 
 #[derive(Debug, Clone)]
-struct ModelParameters {
-    input_len: usize,
-    output_len: usize,
+pub(crate) struct ModelParameters {
+    pub(crate) input_len: usize,
+    pub(crate) output_len: usize,
 
-    weights: Vec<BN254>,
-    ops: Vec<NodeOp>,
+    pub(crate) weights: Vec<BN254>,
+    pub(crate) ops: Vec<NodeOp>,
 
-    input: Vec<BN254>,
-    output: Vec<BN254>,
+    pub(crate) input: Vec<BN254>,
+    pub(crate) output: Vec<BN254>,
 }
 
 declare_circuit!(_ModelCircuit {
@@ -114,12 +114,12 @@ impl<C: Config> Define<C> for ModelCircuit {
 #[cfg(test)]
 mod tests {
 
+    use expander_compiler::field::BN254;
+    use expander_compiler::frontend::BN254Config;
     use expander_compiler::{
         compile::CompileOptions,
         frontend::{compile, CompileResult, M31Config},
     };
-    use expander_compiler::field::BN254;
-    use expander_compiler::frontend::BN254Config;
 
     use crate::ir::op::add::AddOp;
     use crate::ir::op::tensor_view::{TensorViewOp, ViewType};
