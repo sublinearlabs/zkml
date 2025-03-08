@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
+use einsum::EinSum;
 use expander_compiler::frontend::{Config, RootAPI, Variable};
 use tract_core::{
     internal::DimLike,
     model::ShapeFact,
     ops::{
         binary::{BinMiniOp, TypedBinOp},
-        einsum::EinSum,
+        einsum::EinSum as ES,
         konst::Const,
         math::{Add, Sub},
         source::TypedSource,
@@ -14,10 +15,7 @@ use tract_core::{
     },
 };
 
-use crate::tensor::{
-    shape::{self, Shape},
-    tensor::Tensor,
-};
+use crate::tensor::{shape::Shape, tensor::Tensor};
 
 mod einsum;
 pub(crate) mod load_onnx;
@@ -41,7 +39,7 @@ pub(crate) enum SupportedOps {
     Add(SupportedAdd),
     Constant(Constant),
     Input(Input),
-    EinSum(Einsum),
+    EinSum(EinSum),
     Unknown,
 }
 
@@ -50,7 +48,8 @@ impl SupportedOps {
         &self,
         api: &mut Builder,
         history: &HashMap<usize, Tensor<Variable>>,
-        input_value: &Vec<Variable>,
+        input_values: &Vec<Variable>,
+        weight_value: &Vec<Variable>,
     ) -> Tensor<Variable> {
         match self {
             SupportedOps::Add(supported_add) => {
@@ -68,12 +67,21 @@ impl SupportedOps {
                 Tensor::new(Some(res_data), lhs.shape.clone())
             }
             SupportedOps::Input(input) => {
-                let data = input_value[input.info.start_index..input.info.shape.volume()].to_vec();
+                let data = input_values
+                    [input.info.start_index..(input.info.start_index + input.info.shape.volume())]
+                    .to_vec();
                 Tensor::new(Some(data), input.info.shape.clone())
             }
-            SupportedOps::Constant(constant) => todo!(),
+            SupportedOps::Constant(constant) => {
+                let constant_data = weight_value[constant.info.start_index
+                    ..(constant.info.start_index + constant.info.shape.volume())]
+                    .to_vec();
+                Tensor::new(Some(constant_data), constant.info.shape.clone())
+            }
             SupportedOps::EinSum(einsum) => todo!(),
-            SupportedOps::Unknown => todo!(),
+            SupportedOps::Unknown => {
+                panic!("Unknown Op encountered")
+            }
         }
     }
 
@@ -98,10 +106,9 @@ pub(crate) struct SupportedAdd {
 
 #[derive(Debug, Clone)]
 pub(crate) struct Constant {
-    id: usize,
-    info: OpInfo,
-    name: String,
-    // data: Tensor<>,
+    pub(crate) id: usize,
+    pub(crate) info: OpInfo,
+    pub(crate) name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -112,20 +119,11 @@ pub(crate) struct Input {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Einsum {
-    name: String,
-    id: usize,
-    instruction: String,
-    input_count: usize,
-    output_count: usize,
-}
-
-#[derive(Debug, Clone)]
 pub enum TractOps {
     Input(TypedSource),
     Constant(Const),
     Binary(TypedBinOp),
-    EinSum(EinSum),
+    EinSum(ES),
     Unknown,
 }
 
@@ -143,7 +141,7 @@ impl From<Box<dyn TypedOp>> for TractOps {
             return TractOps::Input(res.clone());
         };
 
-        if let Some(res) = value.downcast_ref::<EinSum>() {
+        if let Some(res) = value.downcast_ref::<ES>() {
             return TractOps::EinSum(res.clone());
         };
 
@@ -180,12 +178,13 @@ pub(crate) fn parse_tract_op(
     last_input_index: &mut usize,
 ) -> SupportedOps {
     let res = match op {
-        TractOps::EinSum(ein_sum) => SupportedOps::EinSum(Einsum {
-            name: ein_sum.name().into_owned(),
+        TractOps::EinSum(ein_sum) => SupportedOps::EinSum(EinSum {
             id: op_id,
-            instruction: ein_sum.axes.to_string(),
-            input_count: ein_sum.axes.input_count(),
-            output_count: ein_sum.axes.output_count(),
+            input_str: todo!(),
+            output_str: todo!(),
+            symbol_dimensions: todo!(),
+            summed_indices: todo!(),
+            output_shape: todo!(),
         }),
         TractOps::Input(typed_source) => {
             let shape = Shape::new(get_shape_array_from_shapefact(&typed_source.fact.shape));
@@ -203,7 +202,6 @@ pub(crate) fn parse_tract_op(
                 id: op_id,
                 info: OpInfo::new(*last_input_index, shape.clone()),
                 name: constant.name().to_string(),
-                // data: constant.0,
             });
             *last_input_index += shape.volume();
             res

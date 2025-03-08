@@ -13,7 +13,7 @@ struct ModelParameters {
     input_len: usize,
     output_len: usize,
 
-    weights: Vec<Tensor<M31>>,
+    weights: Vec<M31>,
     ops: Vec<SupportedOps>,
 
     input: Vec<M31>,
@@ -23,7 +23,7 @@ struct ModelParameters {
 declare_circuit!(_ModelCircuit {
     input: [Variable],
     output: [Variable],
-    weights: [[Variable]],
+    weights: [Variable],
     ops: [SupportedOps],
 });
 
@@ -45,7 +45,7 @@ impl ModelCircuit {
             .resize(params.output_len, Variable::default());
         new_circuit
             .weights
-            .resize(params.weights.len(), vec![Variable::default()]);
+            .resize(params.weights.len(), Variable::default());
         new_circuit
             .ops
             .resize(params.ops.len(), SupportedOps::Unknown);
@@ -68,13 +68,13 @@ impl ModelCircuit {
             .resize(params.output_len, M31::default());
         new_assignment
             .weights
-            .resize(params.weights.len(), vec![M31::default()]);
+            .resize(params.weights.len(), M31::default());
         new_assignment
             .ops
             .resize(params.ops.len(), SupportedOps::Unknown);
 
         for i in 0..params.weights.len() {
-            new_assignment.weights[i] = params.weights[i].data.clone();
+            new_assignment.weights[i] = params.weights[i];
         }
         for i in 0..params.input.len() {
             new_assignment.input[i] = params.input[i];
@@ -95,7 +95,7 @@ impl<C: Config> Define<C> for ModelCircuit {
         let mut history: HashMap<usize, Tensor<Variable>> = HashMap::new();
 
         for op in &self.ops {
-            let circuit_eval_result = op.create_circuit(api, &history, &self.input);
+            let circuit_eval_result = op.create_circuit(api, &history, &self.input, &self.weights);
             history.insert(op.get_op_id(), circuit_eval_result);
         }
 
@@ -124,8 +124,8 @@ mod tests {
     };
 
     use crate::{
-        supported_ops::{Input, OpInfo, SupportedAdd, SupportedOps},
-        tensor::{shape::Shape, tensor::Tensor},
+        supported_ops::{Constant, Input, OpInfo, SupportedAdd, SupportedOps},
+        tensor::shape::Shape,
     };
 
     use super::{ModelCircuit, ModelParameters};
@@ -135,10 +135,7 @@ mod tests {
         let params = ModelParameters {
             input_len: 2,
             output_len: 1,
-            weights: vec![Tensor::new(
-                Some(vec![M31::from(3)]),
-                Shape::new(vec![1, 1]),
-            )],
+            weights: vec![M31::from(3)],
             input: vec![M31::from(5)],
             output: vec![M31::from(10)],
             ops: vec![
@@ -149,6 +146,14 @@ mod tests {
                         shape: Shape::new(vec![1, 1]),
                     },
                     name: "input_op".to_string(),
+                }),
+                SupportedOps::Constant(Constant {
+                    id: 1,
+                    info: OpInfo {
+                        start_index: 0,
+                        shape: Shape::new(vec![1, 1]),
+                    },
+                    name: "constant_op".to_string(),
                 }),
                 SupportedOps::Add(SupportedAdd {
                     id: 5,
