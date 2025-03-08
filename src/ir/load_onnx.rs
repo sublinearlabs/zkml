@@ -4,13 +4,13 @@ use std::path::PathBuf;
 use tract_core::internal::tract_itertools::Itertools;
 use tract_core::ops::{einsum::EinSum, konst::Const};
 
-use crate::ir::intermediate_representation::IR;
 use crate::ir::op::add::AddOp;
 use crate::ir::op::einsum::EinsumOp;
 use crate::ir::op::tensor_view::{TensorViewOp, ViewType};
 use crate::ir::op::NodeOp;
 use crate::tensor::shape::Shape;
 use tract_onnx::prelude::*;
+use crate::ir::IR;
 
 pub(crate) fn load_onnx(path: PathBuf) -> Graph<TypedFact, Box<dyn TypedOp>> {
     onnx()
