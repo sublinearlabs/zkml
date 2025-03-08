@@ -1,4 +1,8 @@
+use expander_compiler::field::BN254;
+use tract_core::internal::tract_itertools::Itertools;
 use crate::ir::op::NodeOp;
+use crate::quantization::quantizer::Quantizer;
+
 pub(crate) mod load_onnx;
 pub(crate) mod op;
 
@@ -30,5 +34,10 @@ impl IR {
             output_ids,
             ops,
         }
+    }
+
+    pub(crate) fn quantize_constants<const N: u8>(&self) -> Vec<BN254> {
+        let quantizer = Quantizer::<N>{};
+        self.constants.iter().map(|c| quantizer.quantize(*c)).collect_vec()
     }
 }
