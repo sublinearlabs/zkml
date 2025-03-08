@@ -1,9 +1,9 @@
 use crate::ir::load_onnx::{load_onnx, model_graph_to_ir};
-use crate::model_circuit::{ModelParameters, _ModelCircuit};
-use expander_compiler::frontend::BN254Config;
+use crate::model_circuit::{ModelCircuit, ModelParameters, _ModelCircuit};
+use expander_compiler::frontend::{compile, BN254Config, CompileOptions, CompileResult};
 use std::path::PathBuf;
 
-fn compile_circuit(path: PathBuf) -> _ModelCircuit<BN254Config> {
+fn compile_circuit(path: PathBuf) -> CompileResult<BN254Config> {
     const FRACTIONAL_BITS: u8 = 15;
     let tract_graph = load_onnx(path);
     let ir = model_graph_to_ir(&tract_graph);
@@ -17,5 +17,9 @@ fn compile_circuit(path: PathBuf) -> _ModelCircuit<BN254Config> {
         output: vec![],
     };
 
-    todo!()
+    compile(
+        &ModelCircuit::new_circuit(&model_params),
+        CompileOptions::default(),
+    )
+    .expect("failed to compile circuit")
 }

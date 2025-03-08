@@ -28,14 +28,10 @@ declare_circuit!(_ModelCircuit {
     ops: [NodeOp],
 });
 
-type ModelCircuit = _ModelCircuit<Variable>;
+pub(crate) type ModelCircuit = _ModelCircuit<Variable>;
 
 impl ModelCircuit {
-    type Params = ModelParameters;
-
-    type Assignment = _ModelCircuit<BN254>;
-
-    fn new_circuit(params: &Self::Params) -> Self {
+    pub(crate) fn new_circuit(params: &ModelParameters) -> Self {
         let mut new_circuit = Self::default();
 
         new_circuit
@@ -56,8 +52,8 @@ impl ModelCircuit {
         new_circuit
     }
 
-    fn new_assignment(params: &Self::Params) -> Self::Assignment {
-        let mut new_assignment = Self::Assignment::default();
+    fn new_assignment(params: &ModelParameters) -> _ModelCircuit<BN254> {
+        let mut new_assignment = _ModelCircuit::<BN254>::default();
 
         new_assignment
             .input
