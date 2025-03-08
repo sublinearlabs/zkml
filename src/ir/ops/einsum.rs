@@ -6,6 +6,7 @@ use tract_core::internal::tract_itertools::Itertools;
 
 #[derive(Debug, Default, Clone)]
 pub(crate) struct EinsumOp {
+    id: usize,
     input_str: Vec<Vec<char>>,
     output_str: Vec<char>,
     symbol_dimensions: HashMap<char, usize>,
@@ -14,7 +15,7 @@ pub(crate) struct EinsumOp {
 }
 
 impl EinsumOp {
-    fn new(instruction: &str, input_shapes: &[Shape]) -> Self {
+    fn new(id: usize, instruction: &str, input_shapes: &[Shape]) -> Self {
         let [input_insn, output_insn]: [&str; 2] = instruction
             .split("->")
             .take(2)
@@ -50,6 +51,7 @@ impl EinsumOp {
         }
 
         Self {
+            id,
             input_str: input_insn,
             output_str: output_insn,
             symbol_dimensions,
@@ -175,6 +177,7 @@ impl EinsumOp {
 
 fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
     let einsum_params = EinsumOp::new(
+        0,
         insn,
         inputs
             .iter()
@@ -320,6 +323,7 @@ mod tests {
         }
 
         let params = EinsumOp::new(
+            0,
             "ij,jk->ik",
             &[Shape::new(vec![2, 2]), Shape::new(vec![2, 2])],
         );

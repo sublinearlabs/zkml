@@ -123,7 +123,6 @@ mod tests {
     use crate::ir::ops::add::AddOp;
     use crate::ir::ops::tensor_view::{TensorViewOp, ViewType};
     use crate::ir::ops::Ops;
-    use crate::ir::OpInfo;
     use crate::tensor::{shape::Shape, tensor::Tensor};
 
     use super::{ModelCircuit, ModelParameters};
