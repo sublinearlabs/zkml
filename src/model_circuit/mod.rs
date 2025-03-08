@@ -14,7 +14,7 @@ struct ModelParameters {
     input_len: usize,
     output_len: usize,
 
-    weights: Vec<Tensor<M31>>,
+    weights: Vec<M31>,
     ops: Vec<NodeOp>,
 
     input: Vec<M31>,
@@ -24,7 +24,7 @@ struct ModelParameters {
 declare_circuit!(_ModelCircuit {
     input: [Variable],
     output: [Variable],
-    weights: [[Variable]],
+    weights: [Variable],
     ops: [NodeOp],
 });
 
@@ -46,7 +46,7 @@ impl ModelCircuit {
             .resize(params.output_len, Variable::default());
         new_circuit
             .weights
-            .resize(params.weights.len(), vec![Variable::default()]);
+            .resize(params.weights.len(), Variable::default());
         new_circuit.ops.resize(params.ops.len(), NodeOp::Unknown);
 
         for i in 0..params.ops.len() {
@@ -67,11 +67,11 @@ impl ModelCircuit {
             .resize(params.output_len, M31::default());
         new_assignment
             .weights
-            .resize(params.weights.len(), vec![M31::default()]);
+            .resize(params.weights.len(), M31::default());
         new_assignment.ops.resize(params.ops.len(), NodeOp::Unknown);
 
         for i in 0..params.weights.len() {
-            new_assignment.weights[i] = params.weights[i].data.clone();
+            new_assignment.weights[i] = params.weights[i];
         }
         for i in 0..params.input.len() {
             new_assignment.input[i] = params.input[i];
@@ -132,10 +132,7 @@ mod tests {
         let params = ModelParameters {
             input_len: 2,
             output_len: 1,
-            weights: vec![Tensor::new(
-                Some(vec![M31::from(3)]),
-                Shape::new(vec![1, 1]),
-            )],
+            weights: vec![M31::from(3)],
             input: vec![M31::from(5)],
             output: vec![M31::from(10)],
             ops: vec![
@@ -144,6 +141,12 @@ mod tests {
                     tensor_type: ViewType::Input,
                     start_index: 0,
                     shape: Shape::new(vec![1, 1]),
+                }),
+                NodeOp::TensorView(TensorViewOp {
+                    id: 1,
+                    tensor_type: ViewType::Weights,
+                    start_index: 0,
+                    shape: Shape::new(vec![1, 1])
                 }),
                 NodeOp::Add(AddOp {
                     id: 5,

@@ -23,15 +23,16 @@ impl EinsumOp {
 
 #[derive(Debug, Default, Clone)]
 pub(crate) struct EinsumParams {
-    input_str: Vec<Vec<char>>,
-    output_str: Vec<char>,
-    symbol_dimensions: HashMap<char, usize>,
-    summed_indices: HashMap<char, usize>,
-    output_shape: Shape,
+    pub(crate) id: usize,
+    pub(crate) input_str: Vec<Vec<char>>,
+    pub(crate) output_str: Vec<char>,
+    pub(crate) symbol_dimensions: HashMap<char, usize>,
+    pub(crate) summed_indices: HashMap<char, usize>,
+    pub(crate) output_shape: Shape,
 }
 
 impl EinsumOp {
-    fn new(instruction: &str, input_shapes: &[Shape]) -> EinsumParams {
+    fn new(id: usize, instruction: &str, input_shapes: &[Shape]) -> EinsumParams {
         let [input_insn, output_insn]: [&str; 2] = instruction
             .split("->")
             .take(2)
@@ -67,6 +68,7 @@ impl EinsumOp {
         }
 
         EinsumParams {
+            id,
             input_str: input_insn,
             output_str: output_insn,
             symbol_dimensions,
@@ -192,8 +194,9 @@ impl EinsumParams {
     }
 }
 
-fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
+fn einsum(id: usize, insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
     let einsum_params = EinsumOp::new(
+        id,
         insn,
         inputs
             .iter()
@@ -239,7 +242,7 @@ mod tests {
         // matmul
         let a = Tensor::new(Some(vec![2, 3, 4, 5]), Shape::new(vec![2, 2]));
         let b = Tensor::new(Some(vec![6, 7, 8, 9]), Shape::new(vec![2, 2]));
-        let result = einsum("ij,jk->ik", &[a, b]);
+        let result = einsum(0, "ij,jk->ik", &[a, b]);
         assert_eq!(
             result,
             Tensor::new(Some(vec![36, 41, 64, 73]), Shape::new(vec![2, 2]))
@@ -248,7 +251,7 @@ mod tests {
         // vector contraction
         let a = Tensor::new(Some(vec![2, 3, 4, 5]), Shape::new(vec![2, 2]));
         let b = Tensor::new(Some(vec![6, 7, 8, 9]), Shape::new(vec![2, 2]));
-        let result = einsum("ij,jk->k", &[a, b]);
+        let result = einsum(0, "ij,jk->k", &[a, b]);
         assert_eq!(
             result,
             Tensor::new(Some(vec![100, 114]), Shape::new(vec![2]))
@@ -257,7 +260,7 @@ mod tests {
         // element wise multiplication of two vectors
         let a = Tensor::new(Some(vec![1, 2, 3]), Shape::new(vec![3]));
         let b = Tensor::new(Some(vec![4, 5, 6]), Shape::new(vec![3]));
-        let result = einsum("i,i->i", &[a, b]);
+        let result = einsum(0, "i,i->i", &[a, b]);
         assert_eq!(
             result,
             Tensor::new(Some(vec![4, 10, 18]), Shape::new(vec![3]))
@@ -265,10 +268,10 @@ mod tests {
 
         // sum over rows and columns of a matrix
         let a = Tensor::new(Some(vec![1, 2, 3, 4, 5, 6]), Shape::new(vec![2, 3]));
-        let result = einsum("ij->i", &[a]);
+        let result = einsum(0, "ij->i", &[a]);
         assert_eq!(result, Tensor::new(Some(vec![6, 15]), Shape::new(vec![2])));
         let a = Tensor::new(Some(vec![1, 2, 3, 4, 5, 6]), Shape::new(vec![2, 3]));
-        let result = einsum("ij->j", &[a]);
+        let result = einsum(0, "ij->j", &[a]);
         assert_eq!(
             result,
             Tensor::new(Some(vec![5, 7, 9]), Shape::new(vec![3]))
@@ -277,7 +280,7 @@ mod tests {
         // outer product of two vectors
         let a = Tensor::new(Some(vec![1, 2, 3]), Shape::new(vec![3]));
         let b = Tensor::new(Some(vec![4, 5]), Shape::new(vec![2]));
-        let result = einsum("i,j->ij", &[a, b]);
+        let result = einsum(0, "i,j->ij", &[a, b]);
         assert_eq!(
             result,
             Tensor::new(Some(vec![4, 5, 8, 10, 12, 15]), Shape::new(vec![3, 2]))
@@ -287,7 +290,7 @@ mod tests {
         let a = Tensor::new(Some(vec![1, 2]), Shape::new(vec![2]));
         let b = Tensor::new(Some(vec![3, 4]), Shape::new(vec![2]));
         let c = Tensor::new(Some(vec![5, 6]), Shape::new(vec![2]));
-        let result = einsum("i,j,k->ijk", &[a, b, c]);
+        let result = einsum(0, "i,j,k->ijk", &[a, b, c]);
         assert_eq!(
             result,
             Tensor::new(
@@ -300,7 +303,7 @@ mod tests {
         let a = Tensor::new(Some(vec![1, 2, 3, 4]), Shape::new(vec![2, 2]));
         let b = Tensor::new(Some(vec![5, 6, 7, 8]), Shape::new(vec![2, 2]));
         let c = Tensor::new(Some(vec![9, 10, 11, 12]), Shape::new(vec![2, 2]));
-        let result = einsum("ij,jk,kl->il", &[a, b, c]);
+        let result = einsum(0, "ij,jk,kl->il", &[a, b, c]);
         assert_eq!(
             result,
             Tensor::new(Some(vec![413, 454, 937, 1030]), Shape::new(vec![2, 2]))
@@ -339,6 +342,7 @@ mod tests {
         }
 
         let params = EinsumOp::new(
+            0,
             "ij,jk->ik",
             &[Shape::new(vec![2, 2]), Shape::new(vec![2, 2])],
         );
