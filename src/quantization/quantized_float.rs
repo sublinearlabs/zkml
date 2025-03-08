@@ -29,7 +29,7 @@ impl QuantizedFloat {
         QuantizedFloat(rescaled_mul)
     }
 
-    // TODO: add documentation
+    /// Return inner variable
     pub(crate) fn to_var(self) -> Variable {
         self.0
     }
