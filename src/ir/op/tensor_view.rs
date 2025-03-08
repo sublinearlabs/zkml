@@ -18,7 +18,7 @@ pub(crate) enum ViewType {
 }
 
 impl TensorViewOp {
-    fn create_circuit<C: Config, Builder: RootAPI<C>>(
+    pub(crate) fn create_circuit(
         &self,
         input: &[Variable],
         constants: &[Variable],

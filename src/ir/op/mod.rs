@@ -34,6 +34,11 @@ impl NodeOp {
         inputs: &[Variable],
         constants: &[Variable],
     ) -> Tensor<Variable> {
-        todo!()
+        match &self {
+            NodeOp::Add(op) => op.create_circuit(api, history),
+            NodeOp::TensorView(op) => op.create_circuit(inputs, constants),
+            NodeOp::EinSum(op) => op.create_circuit(api, history),
+            _ => panic!("cannot create circuit for unsupported op"),
+        }
     }
 }

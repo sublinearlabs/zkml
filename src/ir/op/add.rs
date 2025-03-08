@@ -11,7 +11,7 @@ pub(crate) struct AddOp {
 }
 
 impl AddOp {
-    fn create_circuit<C: Config, Builder: RootAPI<C>>(
+    pub(crate) fn create_circuit<C: Config, Builder: RootAPI<C>>(
         &self,
         api: &mut Builder,
         history: &HashMap<usize, Tensor<Variable>>,
