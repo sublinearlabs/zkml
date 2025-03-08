@@ -42,29 +42,30 @@ impl Ops {
         history: &HashMap<usize, Tensor<Variable>>,
         input_value: &Vec<Variable>,
     ) -> Tensor<Variable> {
-        match self {
-            Ops::Add(supported_add) => {
-                let lhs = history.get(&supported_add.lhs_id).unwrap();
-                let rhs = history.get(&supported_add.rhs_id).unwrap();
-
-                assert_eq!(lhs.shape.volume(), rhs.shape.volume());
-
-                let mut res_data = vec![];
-
-                for i in 0..lhs.shape.volume() {
-                    res_data.push(api.add(lhs.data[i], rhs.data[i]))
-                }
-
-                Tensor::new(Some(res_data), lhs.shape.clone())
-            }
-            Ops::Input(input) => {
-                let data = input_value[input.info.start_index..input.info.shape.volume()].to_vec();
-                Tensor::new(Some(data), input.info.shape.clone())
-            }
-            Ops::Constant(constant) => todo!(),
-            Ops::EinSum(einsum) => todo!(),
-            Ops::Unknown => todo!(),
-        }
+        todo!()
+        // match self {
+        //     Ops::Add(supported_add) => {
+        //         let lhs = history.get(&supported_add.lhs_id).unwrap();
+        //         let rhs = history.get(&supported_add.rhs_id).unwrap();
+        //
+        //         assert_eq!(lhs.shape.volume(), rhs.shape.volume());
+        //
+        //         let mut res_data = vec![];
+        //
+        //         for i in 0..lhs.shape.volume() {
+        //             res_data.push(api.add(lhs.data[i], rhs.data[i]))
+        //         }
+        //
+        //         Tensor::new(Some(res_data), lhs.shape.clone())
+        //     }
+        //     Ops::Input(input) => {
+        //         let data = input_value[input.info.start_index..input.info.shape.volume()].to_vec();
+        //         Tensor::new(Some(data), input.info.shape.clone())
+        //     }
+        //     Ops::Constant(constant) => todo!(),
+        //     Ops::EinSum(einsum) => todo!(),
+        //     Ops::Unknown => todo!(),
+        // }
     }
 
     pub(crate) fn id(&self) -> usize {

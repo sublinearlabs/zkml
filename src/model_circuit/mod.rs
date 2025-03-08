@@ -121,7 +121,7 @@ mod tests {
     };
 
     use crate::ir::ops::add::AddOp;
-    use crate::ir::ops::input::InputOp;
+    use crate::ir::ops::tensor_view::{TensorViewOp, ViewType};
     use crate::ir::ops::Ops;
     use crate::ir::OpInfo;
     use crate::tensor::{shape::Shape, tensor::Tensor};
@@ -140,17 +140,14 @@ mod tests {
             input: vec![M31::from(5)],
             output: vec![M31::from(10)],
             ops: vec![
-                Ops::Input(InputOp {
+                Ops::TensorView(TensorViewOp {
                     id: 0,
-                    info: OpInfo {
-                        start_index: 0,
-                        shape: Shape::new(vec![1, 1]),
-                    },
-                    name: "input_op".to_string(),
+                    tensor_type: ViewType::Input,
+                    start_index: 0,
+                    shape: Shape::new(vec![1, 1]),
                 }),
                 Ops::Add(AddOp {
                     id: 5,
-                    name: "add_op".to_string(),
                     lhs_id: 0,
                     rhs_id: 0,
                 }),
