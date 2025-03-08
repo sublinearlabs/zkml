@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use tract_core::internal::tract_itertools::Itertools;
 
 use crate::ir::intermediate_representation::IR;
+use crate::ir::ops::Ops;
 use tract_onnx::prelude::*;
 
 pub(crate) fn load_onnx(path: PathBuf) -> Graph<TypedFact, Box<dyn TypedOp>> {
@@ -32,7 +33,19 @@ pub(crate) fn model_graph_to_ir(model_graph: &Graph<TypedFact, Box<dyn TypedOp>>
 
     let mut ops = vec![];
 
+    for node in &model_graph.nodes {
+        let op = match node.op.name().as_ref() {
+            "Source" => parse_source(node, &mut input_count),
+            unknown_op => panic!("unsupported node: {}", unknown_op),
+        };
+        ops.push(op);
+    }
+
     IR::new(input_count, constants, output_ids, ops)
+}
+
+fn parse_source<F: Fact, O>(node: &Node<F, O>, input_index: &mut usize) -> Ops {
+    todo!()
 }
 
 #[cfg(test)]
