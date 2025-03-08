@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
+use crate::ir::op::NodeOp;
 use expander_compiler::{
     declare_circuit,
     field::M31,
     frontend::{Config, Define, Variable},
 };
 
-use crate::{supported_ops::SupportedOps, tensor::tensor::Tensor};
+use crate::tensor::tensor::Tensor;
 
 #[derive(Debug, Clone)]
 struct ModelParameters {
@@ -14,7 +15,7 @@ struct ModelParameters {
     output_len: usize,
 
     weights: Vec<M31>,
-    ops: Vec<SupportedOps>,
+    ops: Vec<NodeOp>,
 
     input: Vec<M31>,
     output: Vec<M31>,
@@ -24,7 +25,7 @@ declare_circuit!(_ModelCircuit {
     input: [Variable],
     output: [Variable],
     weights: [Variable],
-    ops: [SupportedOps],
+    ops: [NodeOp],
 });
 
 type ModelCircuit = _ModelCircuit<Variable>;
@@ -46,9 +47,7 @@ impl ModelCircuit {
         new_circuit
             .weights
             .resize(params.weights.len(), Variable::default());
-        new_circuit
-            .ops
-            .resize(params.ops.len(), SupportedOps::Unknown);
+        new_circuit.ops.resize(params.ops.len(), NodeOp::Unknown);
 
         for i in 0..params.ops.len() {
             new_circuit.ops[i] = params.ops[i].clone();
@@ -69,9 +68,7 @@ impl ModelCircuit {
         new_assignment
             .weights
             .resize(params.weights.len(), M31::default());
-        new_assignment
-            .ops
-            .resize(params.ops.len(), SupportedOps::Unknown);
+        new_assignment.ops.resize(params.ops.len(), NodeOp::Unknown);
 
         for i in 0..params.weights.len() {
             new_assignment.weights[i] = params.weights[i];
@@ -96,10 +93,10 @@ impl<C: Config> Define<C> for ModelCircuit {
 
         for op in &self.ops {
             let circuit_eval_result = op.create_circuit(api, &history, &self.input, &self.weights);
-            history.insert(op.get_op_id(), circuit_eval_result);
+            history.insert(op.id(), circuit_eval_result);
         }
 
-        let last_circuit = self.ops.last().unwrap().get_op_id();
+        let last_circuit = self.ops.last().unwrap().id();
 
         let expected = history.get(&last_circuit).unwrap();
 
@@ -123,10 +120,10 @@ mod tests {
         frontend::{compile, CompileResult, M31Config},
     };
 
-    use crate::{
-        supported_ops::{Constant, Input, OpInfo, SupportedAdd, SupportedOps},
-        tensor::shape::Shape,
-    };
+    use crate::ir::op::add::AddOp;
+    use crate::ir::op::tensor_view::{TensorViewOp, ViewType};
+    use crate::ir::op::NodeOp;
+    use crate::tensor::{shape::Shape, tensor::Tensor};
 
     use super::{ModelCircuit, ModelParameters};
 
@@ -139,25 +136,20 @@ mod tests {
             input: vec![M31::from(5)],
             output: vec![M31::from(10)],
             ops: vec![
-                SupportedOps::Input(Input {
+                NodeOp::TensorView(TensorViewOp {
                     id: 0,
-                    info: OpInfo {
-                        start_index: 0,
-                        shape: Shape::new(vec![1, 1]),
-                    },
-                    name: "input_op".to_string(),
+                    tensor_type: ViewType::Input,
+                    start_index: 0,
+                    shape: Shape::new(vec![1, 1]),
                 }),
-                SupportedOps::Constant(Constant {
+                NodeOp::TensorView(TensorViewOp {
                     id: 1,
-                    info: OpInfo {
-                        start_index: 0,
-                        shape: Shape::new(vec![1, 1]),
-                    },
-                    name: "constant_op".to_string(),
+                    tensor_type: ViewType::Weights,
+                    start_index: 0,
+                    shape: Shape::new(vec![1, 1]),
                 }),
-                SupportedOps::Add(SupportedAdd {
+                NodeOp::Add(AddOp {
                     id: 5,
-                    name: "add_op".to_string(),
                     lhs_id: 0,
                     rhs_id: 0,
                 }),

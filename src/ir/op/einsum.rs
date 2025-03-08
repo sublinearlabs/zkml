@@ -1,12 +1,36 @@
 use crate::tensor::shape::Shape;
 use crate::tensor::tensor::Tensor;
-use expander_compiler::frontend::{Config, RootAPI, Variable};
-use std::collections::{BTreeSet, HashMap};
+use expander_compiler::frontend::{Config, Define, RootAPI, Variable};
+use std::collections::HashMap;
 use tract_core::internal::tract_itertools::Itertools;
 
-#[derive(Clone, Debug, Default)]
-pub(crate) struct EinSum {
+#[derive(Debug, Default, Clone)]
+pub(crate) struct EinsumOp {
     pub(crate) id: usize,
+    pub(crate) input_ids: Vec<usize>,
+    pub(crate) instruction: String,
+}
+
+impl EinsumOp {
+    pub(crate) fn create_circuit<C: Config, Builder: RootAPI<C>>(
+        &self,
+        api: &mut Builder,
+        history: &HashMap<usize, Tensor<Variable>>,
+    ) -> Tensor<Variable> {
+        let inputs = self
+            .input_ids
+            .iter()
+            .map(|id| history.get(id).expect("history poisoned"))
+            .collect_vec();
+
+        let params = EinsumOp::new(&self.instruction, inputs.as_slice());
+
+        params.create_circuit(api, inputs.as_slice())
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub(crate) struct EinsumParams {
     pub(crate) input_str: Vec<Vec<char>>,
     pub(crate) output_str: Vec<char>,
     pub(crate) symbol_dimensions: HashMap<char, usize>,
@@ -14,8 +38,8 @@ pub(crate) struct EinSum {
     pub(crate) output_shape: Shape,
 }
 
-impl EinSum {
-    fn new(id: usize, instruction: &str, input_shapes: &[Shape]) -> Self {
+impl EinsumOp {
+    fn new<T>(instruction: &str, inputs: &[&Tensor<T>]) -> EinsumParams {
         let [input_insn, output_insn]: [&str; 2] = instruction
             .split("->")
             .take(2)
@@ -31,8 +55,8 @@ impl EinSum {
 
         // map each character index to its dimension size
         let mut symbol_dimensions = HashMap::new();
-        for (inst, shape) in input_insn.iter().zip(input_shapes.iter()) {
-            for (&c, &dim) in inst.iter().zip(shape.dims.iter()) {
+        for (inst, tensor) in input_insn.iter().zip(inputs.iter()) {
+            for (&c, &dim) in inst.iter().zip(tensor.shape.dims.iter()) {
                 symbol_dimensions.insert(c, dim);
             }
         }
@@ -50,8 +74,7 @@ impl EinSum {
             }
         }
 
-        Self {
-            id,
+        EinsumParams {
             input_str: input_insn,
             output_str: output_insn,
             symbol_dimensions,
@@ -59,8 +82,10 @@ impl EinSum {
             output_shape,
         }
     }
+}
 
-    fn compute(&self, inputs: &[Tensor<usize>]) -> Tensor<usize> {
+impl EinsumParams {
+    fn compute(&self, inputs: &[&Tensor<usize>]) -> Tensor<usize> {
         let mut output_tensor = Tensor::new(None, self.output_shape.clone());
 
         for output_index in output_tensor.shape.index_iter(None) {
@@ -116,7 +141,7 @@ impl EinSum {
     fn create_circuit<Builder: RootAPI<T>, T: Config>(
         &self,
         builder: &mut Builder,
-        inputs: &[Tensor<Variable>],
+        inputs: &[&Tensor<Variable>],
     ) -> Tensor<Variable> {
         let mut output_tensor = Tensor::new(None, self.output_shape.clone());
 
@@ -175,21 +200,12 @@ impl EinSum {
     }
 }
 
-fn einsum(id: usize, insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
-    let einsum_params = EinSum::new(
-        id,
-        insn,
-        inputs
-            .iter()
-            .map(|i| i.shape.clone())
-            .collect::<Vec<_>>()
-            .as_slice(),
-    );
+fn einsum(insn: &str, inputs: &[&Tensor<usize>]) -> Tensor<usize> {
+    let einsum_params = EinsumOp::new(insn, inputs);
     einsum_params.compute(inputs)
 }
 
 fn sum_vars<Builder: RootAPI<T>, T: Config>(builder: &mut Builder, input: &[Variable]) -> Variable {
-    // TODO: add proper error handling
     input
         .iter()
         .cloned()
@@ -201,7 +217,6 @@ fn prod_vars<Builder: RootAPI<T>, T: Config>(
     builder: &mut Builder,
     input: &[Variable],
 ) -> Variable {
-    // TODO: add proper error handling
     input
         .iter()
         .cloned()
@@ -211,20 +226,21 @@ fn prod_vars<Builder: RootAPI<T>, T: Config>(
 
 #[cfg(test)]
 mod tests {
-    use crate::supported_ops::einsum::{einsum, EinSum};
+    use crate::ir::op::einsum::{einsum, EinsumOp, EinsumParams};
     use crate::tensor::shape::Shape;
     use crate::tensor::tensor::Tensor;
-    use expander_compiler::compile::CompileOptions;
     use expander_compiler::declare_circuit;
     use expander_compiler::field::M31;
-    use expander_compiler::frontend::{compile, Define, M31Config, RootAPI, Variable};
+    use expander_compiler::frontend::{
+        compile, CompileOptions, Define, M31Config, RootAPI, Variable,
+    };
 
     #[test]
     fn test_einsum() {
         // matmul
         let a = Tensor::new(Some(vec![2, 3, 4, 5]), Shape::new(vec![2, 2]));
         let b = Tensor::new(Some(vec![6, 7, 8, 9]), Shape::new(vec![2, 2]));
-        let result = einsum(0, "ij,jk->ik", &[a, b]);
+        let result = einsum("ij,jk->ik", &[&a, &b]);
         assert_eq!(
             result,
             Tensor::new(Some(vec![36, 41, 64, 73]), Shape::new(vec![2, 2]))
@@ -233,7 +249,7 @@ mod tests {
         // vector contraction
         let a = Tensor::new(Some(vec![2, 3, 4, 5]), Shape::new(vec![2, 2]));
         let b = Tensor::new(Some(vec![6, 7, 8, 9]), Shape::new(vec![2, 2]));
-        let result = einsum(0, "ij,jk->k", &[a, b]);
+        let result = einsum("ij,jk->k", &[&a, &b]);
         assert_eq!(
             result,
             Tensor::new(Some(vec![100, 114]), Shape::new(vec![2]))
@@ -242,7 +258,7 @@ mod tests {
         // element wise multiplication of two vectors
         let a = Tensor::new(Some(vec![1, 2, 3]), Shape::new(vec![3]));
         let b = Tensor::new(Some(vec![4, 5, 6]), Shape::new(vec![3]));
-        let result = einsum(0, "i,i->i", &[a, b]);
+        let result = einsum("i,i->i", &[&a, &b]);
         assert_eq!(
             result,
             Tensor::new(Some(vec![4, 10, 18]), Shape::new(vec![3]))
@@ -250,10 +266,10 @@ mod tests {
 
         // sum over rows and columns of a matrix
         let a = Tensor::new(Some(vec![1, 2, 3, 4, 5, 6]), Shape::new(vec![2, 3]));
-        let result = einsum(0, "ij->i", &[a]);
+        let result = einsum("ij->i", &[&a]);
         assert_eq!(result, Tensor::new(Some(vec![6, 15]), Shape::new(vec![2])));
         let a = Tensor::new(Some(vec![1, 2, 3, 4, 5, 6]), Shape::new(vec![2, 3]));
-        let result = einsum(0, "ij->j", &[a]);
+        let result = einsum("ij->j", &[&a]);
         assert_eq!(
             result,
             Tensor::new(Some(vec![5, 7, 9]), Shape::new(vec![3]))
@@ -262,7 +278,7 @@ mod tests {
         // outer product of two vectors
         let a = Tensor::new(Some(vec![1, 2, 3]), Shape::new(vec![3]));
         let b = Tensor::new(Some(vec![4, 5]), Shape::new(vec![2]));
-        let result = einsum(0, "i,j->ij", &[a, b]);
+        let result = einsum("i,j->ij", &[&a, &b]);
         assert_eq!(
             result,
             Tensor::new(Some(vec![4, 5, 8, 10, 12, 15]), Shape::new(vec![3, 2]))
@@ -272,7 +288,7 @@ mod tests {
         let a = Tensor::new(Some(vec![1, 2]), Shape::new(vec![2]));
         let b = Tensor::new(Some(vec![3, 4]), Shape::new(vec![2]));
         let c = Tensor::new(Some(vec![5, 6]), Shape::new(vec![2]));
-        let result = einsum(0, "i,j,k->ijk", &[a, b, c]);
+        let result = einsum("i,j,k->ijk", &[&a, &b, &c]);
         assert_eq!(
             result,
             Tensor::new(
@@ -285,7 +301,7 @@ mod tests {
         let a = Tensor::new(Some(vec![1, 2, 3, 4]), Shape::new(vec![2, 2]));
         let b = Tensor::new(Some(vec![5, 6, 7, 8]), Shape::new(vec![2, 2]));
         let c = Tensor::new(Some(vec![9, 10, 11, 12]), Shape::new(vec![2, 2]));
-        let result = einsum(0, "ij,jk,kl->il", &[a, b, c]);
+        let result = einsum("ij,jk,kl->il", &[&a, &b, &c]);
         assert_eq!(
             result,
             Tensor::new(Some(vec![413, 454, 937, 1030]), Shape::new(vec![2, 2]))
@@ -299,7 +315,7 @@ mod tests {
             a: [Variable; 4],
             b: [Variable; 4],
             target: [Variable; 4],
-            einsum_params: EinSum
+            einsum_params: EinsumParams
         });
 
         impl Define<M31Config> for EinsumCircuit<Variable> {
@@ -308,7 +324,7 @@ mod tests {
                 let b_tensor = Tensor::new(Some(self.b.to_vec()), Shape::new(vec![2, 2]));
                 let result = self
                     .einsum_params
-                    .create_circuit(api, &[a_tensor, b_tensor]);
+                    .create_circuit(api, &[&a_tensor, &b_tensor]);
                 for (i, v) in self.target.iter().enumerate() {
                     api.assert_is_equal(result.data[i], v);
                 }
@@ -316,17 +332,19 @@ mod tests {
         }
 
         impl EinsumCircuit<Variable> {
-            fn new(params: EinSum) -> Self {
+            fn new(params: EinsumParams) -> Self {
                 let mut circuit = Self::default();
                 circuit.einsum_params = params;
                 circuit
             }
         }
 
-        let params = EinSum::new(
-            0,
+        let params = EinsumOp::new(
             "ij,jk->ik",
-            &[Shape::new(vec![2, 2]), Shape::new(vec![2, 2])],
+            &[
+                &Tensor::<()>::new(None, Shape::new(vec![2, 2])),
+                &Tensor::<()>::new(None, Shape::new(vec![2, 2])),
+            ],
         );
 
         let compile_result =
@@ -335,7 +353,7 @@ mod tests {
             a: [M31::from(2), M31::from(3), M31::from(4), M31::from(5)],
             b: [M31::from(6), M31::from(7), M31::from(8), M31::from(9)],
             target: [M31::from(36), M31::from(41), M31::from(64), M31::from(73)],
-            einsum_params: EinSum::default(),
+            einsum_params: EinsumParams::default(),
         };
         let witness = compile_result
             .witness_solver
