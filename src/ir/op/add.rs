@@ -1,3 +1,4 @@
+use crate::quantization::quantized_float::QuantizedFloat;
 use crate::tensor::tensor::Tensor;
 use expander_compiler::frontend::{Config, RootAPI, Variable};
 use std::collections::HashMap;
@@ -14,8 +15,8 @@ impl AddOp {
     pub(crate) fn create_circuit<C: Config, Builder: RootAPI<C>>(
         &self,
         api: &mut Builder,
-        history: &HashMap<usize, Tensor<Variable>>,
-    ) -> Tensor<Variable> {
+        history: &HashMap<usize, Tensor<QuantizedFloat>>,
+    ) -> Tensor<QuantizedFloat> {
         let lhs = history.get(&self.lhs_id).unwrap();
         let rhs = history.get(&self.rhs_id).unwrap();
 
@@ -25,7 +26,7 @@ impl AddOp {
             .data
             .iter()
             .zip(rhs.data.iter())
-            .map(|(a, b)| api.add(a, b))
+            .map(|(a, b)| a.add(api, b))
             .collect_vec();
 
         Tensor::new(Some(sum), lhs.shape.clone())

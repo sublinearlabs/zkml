@@ -1,3 +1,4 @@
+use crate::quantization::quantized_float::QuantizedFloat;
 use crate::tensor::shape::Shape;
 use crate::tensor::tensor::Tensor;
 use expander_compiler::frontend::{Config, Define, RootAPI, Variable};
@@ -15,8 +16,8 @@ impl EinsumOp {
     pub(crate) fn create_circuit<C: Config, Builder: RootAPI<C>>(
         &self,
         api: &mut Builder,
-        history: &HashMap<usize, Tensor<Variable>>,
-    ) -> Tensor<Variable> {
+        history: &HashMap<usize, Tensor<QuantizedFloat>>,
+    ) -> Tensor<QuantizedFloat> {
         let inputs = self
             .input_ids
             .iter()
@@ -141,8 +142,8 @@ impl EinsumParams {
     fn create_circuit<Builder: RootAPI<T>, T: Config>(
         &self,
         builder: &mut Builder,
-        inputs: &[&Tensor<Variable>],
-    ) -> Tensor<Variable> {
+        inputs: &[&Tensor<QuantizedFloat>],
+    ) -> Tensor<QuantizedFloat> {
         let mut output_tensor = Tensor::new(None, self.output_shape.clone());
 
         for output_index in output_tensor.shape.index_iter(None) {
@@ -205,28 +206,33 @@ fn einsum(insn: &str, inputs: &[&Tensor<usize>]) -> Tensor<usize> {
     einsum_params.compute(inputs)
 }
 
-fn sum_vars<Builder: RootAPI<T>, T: Config>(builder: &mut Builder, input: &[Variable]) -> Variable {
+fn sum_vars<Builder: RootAPI<T>, T: Config>(
+    builder: &mut Builder,
+    input: &[QuantizedFloat],
+) -> QuantizedFloat {
     input
         .iter()
         .cloned()
-        .reduce(|acc, curr| builder.add(acc, curr))
+        .reduce(|acc, curr| acc.add(builder, &curr))
         .unwrap()
 }
 
 fn prod_vars<Builder: RootAPI<T>, T: Config>(
     builder: &mut Builder,
-    input: &[Variable],
-) -> Variable {
+    input: &[QuantizedFloat],
+) -> QuantizedFloat {
+    // TODO: fix the scale here, just using default which is incorrect
     input
         .iter()
         .cloned()
-        .reduce(|acc, curr| builder.mul(acc, curr))
+        .reduce(|acc, curr| acc.mul(builder, &curr, Variable::default()))
         .unwrap()
 }
 
 #[cfg(test)]
 mod tests {
     use crate::ir::op::einsum::{einsum, EinsumOp, EinsumParams};
+    use crate::quantization::quantized_float::QuantizedFloat;
     use crate::tensor::shape::Shape;
     use crate::tensor::tensor::Tensor;
     use expander_compiler::declare_circuit;
@@ -234,6 +240,7 @@ mod tests {
     use expander_compiler::frontend::{
         compile, CompileOptions, Define, M31Config, RootAPI, Variable,
     };
+    use tract_core::internal::tract_itertools::Itertools;
 
     #[test]
     fn test_einsum() {
@@ -320,13 +327,31 @@ mod tests {
 
         impl Define<M31Config> for EinsumCircuit<Variable> {
             fn define<Builder: RootAPI<M31Config>>(&self, api: &mut Builder) {
-                let a_tensor = Tensor::new(Some(self.a.to_vec()), Shape::new(vec![2, 2]));
-                let b_tensor = Tensor::new(Some(self.b.to_vec()), Shape::new(vec![2, 2]));
+                let a_tensor = Tensor::new(
+                    Some(
+                        self.a
+                            .to_vec()
+                            .into_iter()
+                            .map(QuantizedFloat::new)
+                            .collect_vec(),
+                    ),
+                    Shape::new(vec![2, 2]),
+                );
+                let b_tensor = Tensor::new(
+                    Some(
+                        self.b
+                            .to_vec()
+                            .into_iter()
+                            .map(QuantizedFloat::new)
+                            .collect_vec(),
+                    ),
+                    Shape::new(vec![2, 2]),
+                );
                 let result = self
                     .einsum_params
                     .create_circuit(api, &[&a_tensor, &b_tensor]);
                 for (i, v) in self.target.iter().enumerate() {
-                    api.assert_is_equal(result.data[i], v);
+                    api.assert_is_equal(result.data[i].to_var(), v);
                 }
             }
         }

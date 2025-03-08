@@ -1,6 +1,7 @@
 use crate::ir::op::add::AddOp;
 use crate::ir::op::einsum::EinsumOp;
 use crate::ir::op::tensor_view::TensorViewOp;
+use crate::quantization::quantized_float::QuantizedFloat;
 use crate::tensor::tensor::Tensor;
 use expander_compiler::frontend::{Config, RootAPI, Variable};
 use std::collections::HashMap;
@@ -30,10 +31,10 @@ impl NodeOp {
     pub(crate) fn create_circuit<C: Config, Builder: RootAPI<C>>(
         &self,
         api: &mut Builder,
-        history: &HashMap<usize, Tensor<Variable>>,
+        history: &HashMap<usize, Tensor<QuantizedFloat>>,
         inputs: &[Variable],
         constants: &[Variable],
-    ) -> Tensor<Variable> {
+    ) -> Tensor<QuantizedFloat> {
         match &self {
             NodeOp::Add(op) => op.create_circuit(api, history),
             NodeOp::TensorView(op) => op.create_circuit(inputs, constants),

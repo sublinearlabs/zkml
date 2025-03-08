@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::ir::op::NodeOp;
+use crate::quantization::quantized_float::QuantizedFloat;
 use expander_compiler::{
     declare_circuit,
     field::BN254,
@@ -87,7 +88,7 @@ impl ModelCircuit {
 
 impl<C: Config> Define<C> for ModelCircuit {
     fn define<Builder: expander_compiler::frontend::RootAPI<C>>(&self, api: &mut Builder) {
-        let mut history: HashMap<usize, Tensor<Variable>> = HashMap::new();
+        let mut history: HashMap<usize, Tensor<QuantizedFloat>> = HashMap::new();
 
         for op in &self.ops {
             let circuit_eval_result = op.create_circuit(api, &history, &self.input, &self.weights);
@@ -104,7 +105,7 @@ impl<C: Config> Define<C> for ModelCircuit {
 
         // TODO: Handle multiple outputs
         for i in 0..self.output.len() {
-            api.assert_is_equal(expected.data[i], self.output[i]);
+            api.assert_is_equal(expected.data[i].to_var(), self.output[i]);
         }
     }
 }
@@ -122,7 +123,7 @@ mod tests {
     use crate::ir::op::add::AddOp;
     use crate::ir::op::tensor_view::{TensorViewOp, ViewType};
     use crate::ir::op::NodeOp;
-    use crate::tensor::{shape::Shape};
+    use crate::tensor::shape::Shape;
 
     use super::{ModelCircuit, ModelParameters};
 

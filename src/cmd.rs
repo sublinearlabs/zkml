@@ -34,5 +34,4 @@ mod test {
     fn test_compile_circuit() {
         dbg!(compile_circuit("models/linear_regression.onnx".into()).layered_circuit);
     }
-
 }

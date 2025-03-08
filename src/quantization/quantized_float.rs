@@ -1,21 +1,37 @@
 use expander_compiler::frontend::internal::DumpLoadTwoVariables;
 use expander_compiler::frontend::{Config, Define, RootAPI, Variable};
 
-struct QuantizedFloat(Variable);
+#[derive(Default, Debug, Clone, Copy)]
+pub(crate) struct QuantizedFloat(Variable);
 
 impl QuantizedFloat {
+    /// Instantiate a new quantized float from a variable
+    pub(crate) fn new(var: Variable) -> Self {
+        Self(var)
+    }
+
     /// Circuit for add two quantized values
-    fn add<C: Config, B: RootAPI<C>>(&self, api: &mut B, b: &Self) -> Self {
+    pub(crate) fn add<C: Config, B: RootAPI<C>>(&self, api: &mut B, b: &Self) -> Self {
         QuantizedFloat(api.add(self.0, b.0))
     }
 
     /// Circuit for multiplying two quantized values
-    fn mul<C: Config, B: RootAPI<C>>(&self, api: &mut B, b: &Self, scale_inv: Variable) -> Self {
+    pub(crate) fn mul<C: Config, B: RootAPI<C>>(
+        &self,
+        api: &mut B,
+        b: &Self,
+        scale_inv: Variable,
+    ) -> Self {
         // multiply into accumulator
         let acc_mul = api.mul(self.0, b.0);
         // rescale
         let rescaled_mul = api.mul(acc_mul, scale_inv);
         QuantizedFloat(rescaled_mul)
+    }
+
+    // TODO: add documentation
+    pub(crate) fn to_var(self) -> Variable {
+        self.0
     }
 }
 
