@@ -15,25 +15,11 @@ use tract_core::{
     },
 };
 
-use crate::tensor::{shape::Shape, tensor::Tensor};
+use crate::tensor::tensor::Tensor;
 
 mod intermediate_representation;
 pub(crate) mod load_onnx;
 pub(crate) mod ops;
-
-#[derive(Debug, Clone)]
-pub(crate) struct OpInfo {
-    // Index where the Ops data starts in the input data
-    pub(crate) start_index: usize,
-    // Shape of the input
-    pub(crate) shape: Shape,
-}
-
-impl OpInfo {
-    fn new(start_index: usize, shape: Shape) -> Self {
-        Self { start_index, shape }
-    }
-}
 
 impl Ops {
     pub(crate) fn create_circuit<C: Config, Builder: RootAPI<C>>(
