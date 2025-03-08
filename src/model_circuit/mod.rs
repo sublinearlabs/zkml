@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::ir::op::NodeOp;
 use expander_compiler::{
     declare_circuit,
-    field::M31,
+    field::BN254,
     frontend::{Config, Define, Variable},
 };
 
@@ -14,11 +14,11 @@ struct ModelParameters {
     input_len: usize,
     output_len: usize,
 
-    weights: Vec<M31>,
+    weights: Vec<BN254>,
     ops: Vec<NodeOp>,
 
-    input: Vec<M31>,
-    output: Vec<M31>,
+    input: Vec<BN254>,
+    output: Vec<BN254>,
 }
 
 declare_circuit!(_ModelCircuit {
@@ -33,7 +33,7 @@ type ModelCircuit = _ModelCircuit<Variable>;
 impl ModelCircuit {
     type Params = ModelParameters;
 
-    type Assignment = _ModelCircuit<M31>;
+    type Assignment = _ModelCircuit<BN254>;
 
     fn new_circuit(params: &Self::Params) -> Self {
         let mut new_circuit = Self::default();
@@ -61,13 +61,13 @@ impl ModelCircuit {
 
         new_assignment
             .input
-            .resize(params.input_len, M31::default());
+            .resize(params.input_len, BN254::default());
         new_assignment
             .output
-            .resize(params.output_len, M31::default());
+            .resize(params.output_len, BN254::default());
         new_assignment
             .weights
-            .resize(params.weights.len(), M31::default());
+            .resize(params.weights.len(), BN254::default());
         new_assignment.ops.resize(params.ops.len(), NodeOp::Unknown);
 
         for i in 0..params.weights.len() {
@@ -116,9 +116,10 @@ mod tests {
 
     use expander_compiler::{
         compile::CompileOptions,
-        field::M31,
         frontend::{compile, CompileResult, M31Config},
     };
+    use expander_compiler::field::BN254;
+    use expander_compiler::frontend::BN254Config;
 
     use crate::ir::op::add::AddOp;
     use crate::ir::op::tensor_view::{TensorViewOp, ViewType};
@@ -132,9 +133,9 @@ mod tests {
         let params = ModelParameters {
             input_len: 2,
             output_len: 1,
-            weights: vec![M31::from(3)],
-            input: vec![M31::from(5)],
-            output: vec![M31::from(10)],
+            weights: vec![BN254::from(3_u64)],
+            input: vec![BN254::from(5_u64)],
+            output: vec![BN254::from(10_u64)],
             ops: vec![
                 NodeOp::TensorView(TensorViewOp {
                     id: 0,
@@ -156,7 +157,7 @@ mod tests {
             ],
         };
 
-        let compiled_result: CompileResult<M31Config> = compile(
+        let compiled_result: CompileResult<BN254Config> = compile(
             &ModelCircuit::new_circuit(&params),
             CompileOptions::default(),
         )
