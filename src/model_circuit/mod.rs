@@ -1,41 +1,41 @@
 use std::collections::HashMap;
 
 use crate::ir::op::NodeOp;
+use crate::quantization::quantized_float::QuantizedFloat;
 use expander_compiler::{
     declare_circuit,
-    field::M31,
+    field::BN254,
     frontend::{Config, Define, Variable},
 };
 
 use crate::tensor::tensor::Tensor;
 
 #[derive(Debug, Clone)]
-struct ModelParameters {
-    input_len: usize,
-    output_len: usize,
+pub(crate) struct ModelParameters {
+    pub(crate) input_len: usize,
+    pub(crate) output_len: usize,
 
-    weights: Vec<M31>,
-    ops: Vec<NodeOp>,
+    pub(crate) weights: Vec<BN254>,
+    pub(crate) ops: Vec<NodeOp>,
 
-    input: Vec<M31>,
-    output: Vec<M31>,
+    pub(crate) input: Vec<BN254>,
+    pub(crate) output: Vec<BN254>,
+
+    pub(crate) scale_inv: BN254,
 }
 
 declare_circuit!(_ModelCircuit {
     input: [Variable],
     output: [Variable],
     weights: [Variable],
+    scale_inv: Variable,
     ops: [NodeOp],
 });
 
-type ModelCircuit = _ModelCircuit<Variable>;
+pub(crate) type ModelCircuit = _ModelCircuit<Variable>;
 
 impl ModelCircuit {
-    type Params = ModelParameters;
-
-    type Assignment = _ModelCircuit<M31>;
-
-    fn new_circuit(params: &Self::Params) -> Self {
+    pub(crate) fn new_circuit(params: &ModelParameters) -> Self {
         let mut new_circuit = Self::default();
 
         new_circuit
@@ -56,19 +56,22 @@ impl ModelCircuit {
         new_circuit
     }
 
-    fn new_assignment(params: &Self::Params) -> Self::Assignment {
-        let mut new_assignment = Self::Assignment::default();
+    // TODO: refactor this to only take what it needs
+    //  consider assignment parameters
+    fn new_assignment(params: &ModelParameters) -> _ModelCircuit<BN254> {
+        let mut new_assignment = _ModelCircuit::<BN254>::default();
 
         new_assignment
             .input
-            .resize(params.input_len, M31::default());
+            .resize(params.input_len, BN254::default());
         new_assignment
             .output
-            .resize(params.output_len, M31::default());
+            .resize(params.output_len, BN254::default());
         new_assignment
             .weights
-            .resize(params.weights.len(), M31::default());
+            .resize(params.weights.len(), BN254::default());
         new_assignment.ops.resize(params.ops.len(), NodeOp::Unknown);
+        new_assignment.scale_inv = params.scale_inv;
 
         for i in 0..params.weights.len() {
             new_assignment.weights[i] = params.weights[i];
@@ -89,10 +92,11 @@ impl ModelCircuit {
 
 impl<C: Config> Define<C> for ModelCircuit {
     fn define<Builder: expander_compiler::frontend::RootAPI<C>>(&self, api: &mut Builder) {
-        let mut history: HashMap<usize, Tensor<Variable>> = HashMap::new();
+        let mut history: HashMap<usize, Tensor<QuantizedFloat>> = HashMap::new();
 
         for op in &self.ops {
-            let circuit_eval_result = op.create_circuit(api, &history, &self.input, &self.weights);
+            let circuit_eval_result =
+                op.create_circuit(api, &history, &self.input, &self.weights, self.scale_inv);
             history.insert(op.id(), circuit_eval_result);
         }
 
@@ -106,7 +110,7 @@ impl<C: Config> Define<C> for ModelCircuit {
 
         // TODO: Handle multiple outputs
         for i in 0..self.output.len() {
-            api.assert_is_equal(expected.data[i], self.output[i]);
+            api.assert_is_equal(expected.data[i].to_var(), self.output[i]);
         }
     }
 }
@@ -114,16 +118,17 @@ impl<C: Config> Define<C> for ModelCircuit {
 #[cfg(test)]
 mod tests {
 
+    use expander_compiler::field::BN254;
+    use expander_compiler::frontend::BN254Config;
     use expander_compiler::{
         compile::CompileOptions,
-        field::M31,
-        frontend::{compile, CompileResult, M31Config},
+        frontend::{compile, CompileResult},
     };
 
     use crate::ir::op::add::AddOp;
     use crate::ir::op::tensor_view::{TensorViewOp, ViewType};
     use crate::ir::op::NodeOp;
-    use crate::tensor::{shape::Shape, tensor::Tensor};
+    use crate::tensor::shape::Shape;
 
     use super::{ModelCircuit, ModelParameters};
 
@@ -132,9 +137,11 @@ mod tests {
         let params = ModelParameters {
             input_len: 2,
             output_len: 1,
-            weights: vec![M31::from(3)],
-            input: vec![M31::from(5)],
-            output: vec![M31::from(10)],
+            weights: vec![BN254::from(3_u64)],
+            input: vec![BN254::from(5_u64)],
+            output: vec![BN254::from(10_u64)],
+            // scale not necessary for this example
+            scale_inv: BN254::one(),
             ops: vec![
                 NodeOp::TensorView(TensorViewOp {
                     id: 0,
@@ -156,7 +163,7 @@ mod tests {
             ],
         };
 
-        let compiled_result: CompileResult<M31Config> = compile(
+        let compiled_result: CompileResult<BN254Config> = compile(
             &ModelCircuit::new_circuit(&params),
             CompileOptions::default(),
         )
