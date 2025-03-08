@@ -50,7 +50,7 @@ impl SupportedOps {
         &self,
         api: &mut Builder,
         history: &HashMap<usize, Tensor<Variable>>,
-        input_value: &Vec<Vec<Variable>>,
+        input_value: &Vec<Variable>,
     ) -> Tensor<Variable> {
         match self {
             SupportedOps::Add(supported_add) => {
@@ -70,8 +70,11 @@ impl SupportedOps {
 
                 Tensor::new(Some(res_data), lhs.shape.clone())
             }
+            SupportedOps::Input(input) => {
+                let data = input_value[input.info.start_index..input.info.shape.volume()].to_vec();
+                Tensor::new(Some(data), input.info.shape.clone())
+            }
             SupportedOps::Constant(constant) => todo!(),
-            SupportedOps::Input(input) => todo!(),
             SupportedOps::EinSum(einsum) => todo!(),
             SupportedOps::Unknown => todo!(),
         }

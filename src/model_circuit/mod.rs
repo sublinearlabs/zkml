@@ -16,13 +16,13 @@ struct ModelParameters {
     weights: Vec<Tensor<M31>>,
     ops: Vec<SupportedOps>,
 
-    input: Vec<Tensor<M31>>,
-    output: Vec<Tensor<M31>>,
+    input: Vec<M31>,
+    output: Vec<M31>,
 }
 
 declare_circuit!(_ModelCircuit {
-    input: [[Variable]],
-    output: [[Variable]],
+    input: [Variable],
+    output: [Variable],
     weights: [[Variable]],
     ops: [SupportedOps],
 });
@@ -39,10 +39,10 @@ impl ModelCircuit {
 
         new_circuit
             .input
-            .resize(params.input_len, vec![Variable::default()]);
+            .resize(params.input_len, Variable::default());
         new_circuit
             .output
-            .resize(params.output_len, vec![Variable::default()]);
+            .resize(params.output_len, Variable::default());
         new_circuit
             .weights
             .resize(params.weights.len(), vec![Variable::default()]);
@@ -62,10 +62,10 @@ impl ModelCircuit {
 
         new_assignment
             .input
-            .resize(params.input_len, vec![M31::default()]);
+            .resize(params.input_len, M31::default());
         new_assignment
             .output
-            .resize(params.output_len, vec![M31::default()]);
+            .resize(params.output_len, M31::default());
         new_assignment
             .weights
             .resize(params.weights.len(), vec![M31::default()]);
@@ -77,10 +77,10 @@ impl ModelCircuit {
             new_assignment.weights[i] = params.weights[i].data.clone();
         }
         for i in 0..params.input.len() {
-            new_assignment.input[i] = params.input[i].data.clone();
+            new_assignment.input[i] = params.input[i];
         }
         for i in 0..params.output.len() {
-            new_assignment.output[i] = params.output[i].data.clone();
+            new_assignment.output[i] = params.output[i];
         }
         for i in 0..params.ops.len() {
             new_assignment.ops[i] = params.ops[i].clone();
@@ -103,12 +103,14 @@ impl<C: Config> Define<C> for ModelCircuit {
 
         let expected = history.get(&last_circuit).unwrap();
 
-        dbg!(expected);
+        dbg!(&history);
+        dbg!(&expected);
         dbg!(&self.output);
 
-        // for i in 0..expected.len() {
-        //     api.assert_is_equal(expected[i], self.output[i]);
-        // }
+        // TODO: Handle multiple outputs
+        for i in 0..self.output.len() {
+            api.assert_is_equal(expected.data[i], self.output[i]);
+        }
     }
 }
 
@@ -137,20 +139,14 @@ mod tests {
                 Some(vec![M31::from(3)]),
                 Shape::new(vec![1, 1]),
             )],
-            input: vec![Tensor::new(
-                Some(vec![M31::from(5), M31::from(3)]),
-                Shape::new(vec![1, 2]),
-            )],
-            output: vec![Tensor::new(
-                Some(vec![M31::from(8)]),
-                Shape::new(vec![1, 1]),
-            )],
+            input: vec![M31::from(5)],
+            output: vec![M31::from(10)],
             ops: vec![
                 SupportedOps::Input(Input {
                     id: 0,
                     info: OpInfo {
                         start_index: 0,
-                        shape: Shape::new(vec![1, 2]),
+                        shape: Shape::new(vec![1, 1]),
                     },
                     name: "input_op".to_string(),
                 }),
