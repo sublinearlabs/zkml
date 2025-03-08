@@ -35,9 +35,5 @@ impl NodeOp {
         constants: &[Variable],
     ) -> Tensor<Variable> {
         todo!()
-        // match &self {
-        //
-        //
-        // }
     }
 }

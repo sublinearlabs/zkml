@@ -20,8 +20,6 @@ pub(crate) enum ViewType {
 impl TensorViewOp {
     fn create_circuit<C: Config, Builder: RootAPI<C>>(
         &self,
-        api: &mut Builder,
-        history: &HashMap<usize, Tensor<Variable>>,
         input: &[Variable],
         constants: &[Variable],
     ) -> Tensor<Variable> {
