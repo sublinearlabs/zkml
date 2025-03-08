@@ -26,7 +26,7 @@ impl TensorViewOp {
         let range = self.start_index..(self.start_index + self.shape.volume());
         let tensor_data = match self.tensor_type {
             ViewType::Input => input[range].to_vec(),
-            ViewType::Weights => constants[range].to_vec()
+            ViewType::Weights => constants[range].to_vec(),
         };
         Tensor::new(Some(tensor_data), self.shape.clone())
     }
