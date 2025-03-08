@@ -34,11 +34,12 @@ impl NodeOp {
         history: &HashMap<usize, Tensor<QuantizedFloat>>,
         inputs: &[Variable],
         constants: &[Variable],
+        scale_inv: Variable,
     ) -> Tensor<QuantizedFloat> {
         match &self {
             NodeOp::Add(op) => op.create_circuit(api, history),
             NodeOp::TensorView(op) => op.create_circuit(inputs, constants),
-            NodeOp::EinSum(op) => op.create_circuit(api, history),
+            NodeOp::EinSum(op) => op.create_circuit(api, history, scale_inv),
             _ => panic!("cannot create circuit for unsupported op"),
         }
     }

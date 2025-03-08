@@ -20,12 +20,15 @@ pub(crate) struct ModelParameters {
 
     pub(crate) input: Vec<BN254>,
     pub(crate) output: Vec<BN254>,
+
+    pub(crate) scale_inv: BN254,
 }
 
 declare_circuit!(_ModelCircuit {
     input: [Variable],
     output: [Variable],
     weights: [Variable],
+    scale_inv: Variable,
     ops: [NodeOp],
 });
 
@@ -68,6 +71,7 @@ impl ModelCircuit {
             .weights
             .resize(params.weights.len(), BN254::default());
         new_assignment.ops.resize(params.ops.len(), NodeOp::Unknown);
+        new_assignment.scale_inv = params.scale_inv;
 
         for i in 0..params.weights.len() {
             new_assignment.weights[i] = params.weights[i];
@@ -91,7 +95,8 @@ impl<C: Config> Define<C> for ModelCircuit {
         let mut history: HashMap<usize, Tensor<QuantizedFloat>> = HashMap::new();
 
         for op in &self.ops {
-            let circuit_eval_result = op.create_circuit(api, &history, &self.input, &self.weights);
+            let circuit_eval_result =
+                op.create_circuit(api, &history, &self.input, &self.weights, self.scale_inv);
             history.insert(op.id(), circuit_eval_result);
         }
 
@@ -135,6 +140,8 @@ mod tests {
             weights: vec![BN254::from(3_u64)],
             input: vec![BN254::from(5_u64)],
             output: vec![BN254::from(10_u64)],
+            // scale not necessary for this example
+            scale_inv: BN254::one(),
             ops: vec![
                 NodeOp::TensorView(TensorViewOp {
                     id: 0,

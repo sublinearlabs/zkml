@@ -17,6 +17,7 @@ impl EinsumOp {
         &self,
         api: &mut Builder,
         history: &HashMap<usize, Tensor<QuantizedFloat>>,
+        scale_inv: Variable,
     ) -> Tensor<QuantizedFloat> {
         let inputs = self
             .input_ids
@@ -26,7 +27,7 @@ impl EinsumOp {
 
         let params = EinsumOp::new(&self.instruction, inputs.as_slice());
 
-        params.create_circuit(api, inputs.as_slice())
+        params.create_circuit(api, inputs.as_slice(), scale_inv)
     }
 }
 
@@ -143,6 +144,7 @@ impl EinsumParams {
         &self,
         builder: &mut Builder,
         inputs: &[&Tensor<QuantizedFloat>],
+        scale_inv: Variable,
     ) -> Tensor<QuantizedFloat> {
         let mut output_tensor = Tensor::new(None, self.output_shape.clone());
 
@@ -170,7 +172,7 @@ impl EinsumParams {
                         *tensor.get(&indices)
                     })
                     .collect_vec();
-                prod_vars(builder, vars.as_slice())
+                prod_vars(builder, vars.as_slice(), scale_inv)
             } else {
                 let combinations = summed_ranges.into_iter().multi_cartesian_product();
                 let vars = combinations
@@ -188,7 +190,7 @@ impl EinsumParams {
                                 *tensor.get(&indices)
                             })
                             .collect_vec();
-                        prod_vars(builder, vars.as_slice())
+                        prod_vars(builder, vars.as_slice(), scale_inv)
                     })
                     .collect_vec();
                 sum_vars(builder, vars.as_slice())
@@ -220,12 +222,12 @@ fn sum_vars<Builder: RootAPI<T>, T: Config>(
 fn prod_vars<Builder: RootAPI<T>, T: Config>(
     builder: &mut Builder,
     input: &[QuantizedFloat],
+    scale_inv: Variable,
 ) -> QuantizedFloat {
-    // TODO: fix the scale here, just using default which is incorrect
     input
         .iter()
         .cloned()
-        .reduce(|acc, curr| acc.mul(builder, &curr, Variable::default()))
+        .reduce(|acc, curr| acc.mul(builder, &curr, scale_inv))
         .unwrap()
 }
 
@@ -236,7 +238,7 @@ mod tests {
     use crate::tensor::shape::Shape;
     use crate::tensor::tensor::Tensor;
     use expander_compiler::declare_circuit;
-    use expander_compiler::field::M31;
+    use expander_compiler::field::{FieldArith, M31};
     use expander_compiler::frontend::{
         compile, CompileOptions, Define, M31Config, RootAPI, Variable,
     };
@@ -322,6 +324,7 @@ mod tests {
             a: [Variable; 4],
             b: [Variable; 4],
             target: [Variable; 4],
+            scale_inv: Variable,
             einsum_params: EinsumParams
         });
 
@@ -347,9 +350,10 @@ mod tests {
                     ),
                     Shape::new(vec![2, 2]),
                 );
-                let result = self
-                    .einsum_params
-                    .create_circuit(api, &[&a_tensor, &b_tensor]);
+                // values are not fixed point hence scale inv of 1 is sufficient
+                let result =
+                    self.einsum_params
+                        .create_circuit(api, &[&a_tensor, &b_tensor], self.scale_inv);
                 for (i, v) in self.target.iter().enumerate() {
                     api.assert_is_equal(result.data[i].to_var(), v);
                 }
@@ -378,6 +382,7 @@ mod tests {
             a: [M31::from(2), M31::from(3), M31::from(4), M31::from(5)],
             b: [M31::from(6), M31::from(7), M31::from(8), M31::from(9)],
             target: [M31::from(36), M31::from(41), M31::from(64), M31::from(73)],
+            scale_inv: M31::one(),
             einsum_params: EinsumParams::default(),
         };
         let witness = compile_result
