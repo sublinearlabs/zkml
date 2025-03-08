@@ -11,16 +11,16 @@ pub(crate) enum NodeOp {
     Add(AddOp),
     TensorView(TensorViewOp),
     EinSum(EinsumOp),
-    Unknown
+    Unknown,
 }
 
 impl NodeOp {
-    pub(crate) fn id(&self) -> usize{
+    pub(crate) fn id(&self) -> usize {
         match &self {
-            AddOp(op) => op.id,
-            TensorViewOp(op) => op.id,
-            EinsumOp(op) => op.id,
-            _ => panic!("cannot get id for unsupported op")
+            NodeOp::Add(op) => op.id,
+            NodeOp::TensorView(op) => op.id,
+            NodeOp::EinSum(op) => op.id,
+            _ => panic!("cannot get id for unsupported op"),
         }
     }
 }
