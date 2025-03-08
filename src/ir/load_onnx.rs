@@ -1,11 +1,12 @@
 use std::fmt::Debug;
+use std::ops::Deref;
 use std::path::PathBuf;
 use tract_core::internal::tract_itertools::Itertools;
+use tract_core::ops::konst::Const;
 
 use crate::ir::intermediate_representation::IR;
 use crate::ir::ops::tensor_view::{TensorViewOp, ViewType};
 use crate::ir::ops::Ops;
-use crate::ir::TractOps;
 use crate::tensor::shape::Shape;
 use tract_onnx::prelude::*;
 
@@ -38,8 +39,10 @@ pub(crate) fn model_graph_to_ir(model_graph: &Graph<TypedFact, Box<dyn TypedOp>>
     let mut ops = vec![];
 
     for node in &model_graph.nodes {
+        dbg!(node.op.name().as_ref());
         let op = match node.op.name().as_ref() {
-            "Source" => parse_source(node.into(), &mut input_count),
+            "Source" => parse_source(node, &mut input_count),
+            "Const" => parse_const(node, &mut constants),
             unknown_op => panic!("unsupported node: {}", unknown_op),
         };
         dbg!(&op);
@@ -50,16 +53,7 @@ pub(crate) fn model_graph_to_ir(model_graph: &Graph<TypedFact, Box<dyn TypedOp>>
 }
 
 fn parse_source<F: Fact, O: Debug>(node: &Node<F, O>, input_index: &mut usize) -> Ops {
-    assert_eq!(node.outputs.len(), 1);
-    let shape_data = &node.outputs[0]
-        .fact
-        .to_typed_fact()
-        .expect("should be typed model")
-        .shape;
-    let shape_dims = shape_data
-        .as_concrete()
-        .expect("failed to get concrete shape");
-    let shape = Shape::new(shape_dims.to_vec());
+    let shape = tract_shape_data(&node);
     let volume = shape.volume();
     let op = Ops::TensorView(TensorViewOp {
         id: node.id,
@@ -69,6 +63,54 @@ fn parse_source<F: Fact, O: Debug>(node: &Node<F, O>, input_index: &mut usize) -
     });
     *input_index += volume;
     op
+}
+
+fn parse_const<F: Fact, O>(node: &Node<F, O>, constants: &mut Vec<f32>) -> Ops
+where
+    O: Debug + Clone + Deref,
+    O::Target: TypedOp,
+{
+    let shape = tract_shape_data(&node);
+    let const_tensor = &node
+        .op
+        .as_typed()
+        .expect("op should implement typed")
+        .downcast_ref::<Const>()
+        .expect("failed to downcast op to const")
+        .0;
+    // ensure that the datum type is f32
+    assert_eq!(
+        const_tensor.datum_type(),
+        DatumType::F32,
+        "const values should only be f32"
+    );
+    let data = const_tensor
+        .as_slice::<f32>()
+        .expect("constant failed to convert to slice");
+
+    // create op
+    let op = Ops::TensorView(TensorViewOp {
+        id: node.id,
+        tensor_type: ViewType::Weights,
+        start_index: constants.len(),
+        shape,
+    });
+
+    constants.extend_from_slice(data);
+    op
+}
+
+fn tract_shape_data<F: Fact, O: Debug>(node: &Node<F, O>) -> Shape {
+    assert_eq!(node.outputs.len(), 1);
+    let shape_data = &node.outputs[0]
+        .fact
+        .to_typed_fact()
+        .expect("should be typed model")
+        .shape;
+    let shape_dims = shape_data
+        .as_concrete()
+        .expect("failed to get concrete shape");
+    Shape::new(shape_dims.to_vec())
 }
 
 #[cfg(test)]
