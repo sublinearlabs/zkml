@@ -1,27 +1,33 @@
+use std::collections::HashMap;
+
+use expander_compiler::frontend::{Config, RootAPI, Variable};
 use tract_core::{
     internal::DimLike,
+    model::ShapeFact,
     ops::{
-        binary::TypedBinOp,
+        binary::{BinMiniOp, TypedBinOp},
         einsum::EinSum,
         konst::Const,
         math::{Add, Sub},
         source::TypedSource,
-        TypedOp,
+        Op, TypedOp,
     },
-    prelude::*,
 };
 
-use crate::tensor::shape::Shape;
+use crate::tensor::{
+    shape::{self, Shape},
+    tensor::Tensor,
+};
 
 mod einsum;
-mod load_onnx;
+pub(crate) mod load_onnx;
 
 #[derive(Debug, Clone)]
-struct OpInfo {
+pub(crate) struct OpInfo {
     // Index where the Ops data starts in the input data
-    start_index: usize,
+    pub(crate) start_index: usize,
     // Shape of the input
-    shape: Shape,
+    pub(crate) shape: Shape,
 }
 
 impl OpInfo {
@@ -39,18 +45,70 @@ pub(crate) enum SupportedOps {
     Unknown,
 }
 
-#[derive(Debug, Clone)]
-struct SupportedAdd {
-    id: usize,
-    name: String,
+impl SupportedOps {
+    pub(crate) fn create_circuit<C: Config, Builder: RootAPI<C>>(
+        &self,
+        api: &mut Builder,
+        history: &HashMap<usize, Tensor<Variable>>,
+        input_value: &Vec<Variable>,
+    ) -> Tensor<Variable> {
+        match self {
+            SupportedOps::Add(supported_add) => {
+                let lhs = history.get(&supported_add.lhs_id).unwrap();
+                let rhs = history.get(&supported_add.rhs_id).unwrap();
+
+                assert_eq!(lhs.shape.volume(), rhs.shape.volume());
+
+                let mut res_data = vec![];
+
+                for i in 0..lhs.shape.volume() {
+                    res_data.push(api.add(lhs.data[i], rhs.data[i]))
+                }
+
+                Tensor::new(Some(res_data), lhs.shape.clone())
+            }
+            SupportedOps::Input(input) => {
+                let data = input_value[input.info.start_index..input.info.shape.volume()].to_vec();
+                Tensor::new(Some(data), input.info.shape.clone())
+            }
+            SupportedOps::Constant(constant) => todo!(),
+            SupportedOps::EinSum(einsum) => todo!(),
+            SupportedOps::Unknown => todo!(),
+        }
+    }
+
+    pub(crate) fn get_op_id(&self) -> usize {
+        match self {
+            SupportedOps::Add(supported_add) => supported_add.id,
+            SupportedOps::Constant(constant) => constant.id,
+            SupportedOps::Input(input) => input.id,
+            SupportedOps::EinSum(einsum) => einsum.id,
+            SupportedOps::Unknown => panic!("Failed trying to get Id for Unknown Op"),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
-struct Constant {
+pub(crate) struct SupportedAdd {
+    pub(crate) id: usize,
+    pub(crate) name: String,
+    pub(crate) lhs_id: usize,
+    pub(crate) rhs_id: usize,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Constant {
     id: usize,
     info: OpInfo,
     name: String,
-    data: Arc<Tensor>,
+    // data: Tensor<>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Input {
+    pub(crate) id: usize,
+    pub(crate) info: OpInfo,
+    pub(crate) name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -60,13 +118,6 @@ pub(crate) struct Einsum {
     instruction: String,
     input_count: usize,
     output_count: usize,
-}
-
-#[derive(Debug, Clone)]
-struct Input {
-    id: usize,
-    info: OpInfo,
-    name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -108,13 +159,13 @@ pub enum TractBinaryOps {
     Unknown,
 }
 
-impl From<TypedBinOp> for TractBinaryOps {
-    fn from(value: TypedBinOp) -> Self {
-        if let Some(res) = value.0.downcast_ref::<Add>() {
+impl From<Box<dyn BinMiniOp>> for TractBinaryOps {
+    fn from(value: Box<dyn BinMiniOp>) -> Self {
+        if let Some(res) = value.downcast_ref::<Add>() {
             return TractBinaryOps::Add(res.clone());
         };
 
-        if let Some(res) = value.0.downcast_ref::<Sub>() {
+        if let Some(res) = value.downcast_ref::<Sub>() {
             return TractBinaryOps::Sub(res.clone());
         };
 
@@ -152,25 +203,26 @@ pub(crate) fn parse_tract_op(
                 id: op_id,
                 info: OpInfo::new(*last_input_index, shape.clone()),
                 name: constant.name().to_string(),
-                data: constant.0,
+                // data: constant.0,
             });
             *last_input_index += shape.volume();
             res
         }
-        // TractOps::Binary(typed_bin_op) => {
-        //     let supported_bin_op = typed_bin_op
-        //         .0
-        //         .downcast_ref::<TractBinaryOps>()
-        //         .unwrap();
+        TractOps::Binary(typed_bin_op) => {
+            let supported_bin_op: TractBinaryOps = typed_bin_op.0.into();
 
-        //     match supported_bin_op {
-        //         TractBinaryOps::Add(add) => SupportedOps::Add(SupportedAdd {
-        //             id: op_id,
-        //             name: add.name().to_string(),
-        //         }),
-        //         _ => SupportedOps::Unknown,
-        //     }
-        // }
+            match supported_bin_op {
+                TractBinaryOps::Add(add) => SupportedOps::Add(SupportedAdd {
+                    id: op_id,
+                    name: add.name().to_string(),
+                    // todo!(): FIX
+                    // Fetch info from tract
+                    lhs_id: todo!(),
+                    rhs_id: todo!(),
+                }),
+                _ => SupportedOps::Unknown,
+            }
+        }
         _ => SupportedOps::Unknown,
     };
     res
