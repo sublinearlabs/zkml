@@ -1,5 +1,6 @@
 use crate::ir::Ops;
 
+#[derive(Debug)]
 /// Circuit friendly representation of some ML computational graph
 pub(crate) struct IR {
     /// number of flattened inputs to some model

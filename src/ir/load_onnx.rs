@@ -5,6 +5,7 @@ use tract_core::internal::tract_itertools::Itertools;
 use tract_core::ops::{einsum::EinSum, konst::Const};
 
 use crate::ir::intermediate_representation::IR;
+use crate::ir::ops::add::AddOp;
 use crate::ir::ops::einsum::EinsumOp;
 use crate::ir::ops::tensor_view::{TensorViewOp, ViewType};
 use crate::ir::ops::Ops;
@@ -40,14 +41,13 @@ pub(crate) fn model_graph_to_ir(model_graph: &Graph<TypedFact, Box<dyn TypedOp>>
     let mut ops = vec![];
 
     for node in &model_graph.nodes {
-        dbg!(node.op.name().as_ref());
         let op = match node.op.name().as_ref() {
             "Source" => parse_source(node, &mut input_count),
             "Const" => parse_const(node, &mut constants),
             "EinSum" => parse_einsum(node),
+            "Add" => parse_add(node),
             unknown_op => panic!("unsupported node: {}", unknown_op),
         };
-        dbg!(&op);
         ops.push(op);
     }
 
@@ -80,6 +80,7 @@ where
         .downcast_ref::<Const>()
         .expect("failed to downcast op to const")
         .0;
+
     // ensure that the datum type is f32
     assert_eq!(
         const_tensor.datum_type(),
@@ -107,15 +108,7 @@ where
     O: Debug + Deref,
     O::Target: TypedOp,
 {
-    let input_ids = node
-        .inputs
-        .iter()
-        .map(|inlet| {
-            // handling nodes with just one output so inlet slot should always be 0
-            assert_eq!(inlet.slot, 0, "encountered inlet slot != 0");
-            inlet.node
-        })
-        .collect_vec();
+    let input_ids = input_ids(&node);
     let einsum_op = &node
         .op
         .as_typed()
@@ -128,6 +121,15 @@ where
         id: node.id,
         input_ids,
         instruction: einsum_op.axes.to_string(),
+    })
+}
+
+fn parse_add<F: Fact, O: Debug>(node: &Node<F, O>) -> Ops {
+    let input_ids = input_ids(node);
+    Ops::Add(AddOp {
+        id: node.id,
+        lhs_id: input_ids[0],
+        rhs_id: input_ids[1],
     })
 }
 
@@ -144,13 +146,23 @@ fn tract_shape_data<F: Fact, O: Debug>(node: &Node<F, O>) -> Shape {
     Shape::new(shape_dims.to_vec())
 }
 
+fn input_ids<F: Fact, O: Debug>(node: &Node<F, O>) -> Vec<usize> {
+    node.inputs
+        .iter()
+        .map(|inlet| {
+            // handling nodes with just one output so inlet slot should always be 0
+            assert_eq!(inlet.slot, 0, "encountered inlet slot != 0");
+            inlet.node
+        })
+        .collect_vec()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{load_onnx, model_graph_to_ir};
     #[test]
     fn test_load_onnx() {
         let model_graph = load_onnx("models/linear_regression.onnx".into());
-        dbg!(&model_graph);
-        let _ = model_graph_to_ir(&model_graph);
+        let ir = model_graph_to_ir(&model_graph);
     }
 }
