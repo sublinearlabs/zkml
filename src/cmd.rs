@@ -8,6 +8,8 @@ fn compile_circuit(path: PathBuf) -> CompileResult<BN254Config> {
     let tract_graph = load_onnx(path);
     let ir = model_graph_to_ir(&tract_graph);
 
+    dbg!(&ir);
+
     let model_params = ModelParameters {
         input_len: ir.input_count,
         output_len: ir.output_ids.len(),
@@ -22,4 +24,15 @@ fn compile_circuit(path: PathBuf) -> CompileResult<BN254Config> {
         CompileOptions::default(),
     )
     .expect("failed to compile circuit")
+}
+
+#[cfg(test)]
+mod test {
+    use crate::cmd::compile_circuit;
+
+    #[test]
+    fn test_compile_circuit() {
+        dbg!(compile_circuit("models/linear_regression.onnx".into()).layered_circuit);
+    }
+
 }

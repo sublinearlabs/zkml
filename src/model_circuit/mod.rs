@@ -52,6 +52,8 @@ impl ModelCircuit {
         new_circuit
     }
 
+    // TODO: refactor this to only take what it needs
+    //  consider assignment parameters
     fn new_assignment(params: &ModelParameters) -> _ModelCircuit<BN254> {
         let mut new_assignment = _ModelCircuit::<BN254>::default();
 
@@ -114,13 +116,13 @@ mod tests {
     use expander_compiler::frontend::BN254Config;
     use expander_compiler::{
         compile::CompileOptions,
-        frontend::{compile, CompileResult, M31Config},
+        frontend::{compile, CompileResult},
     };
 
     use crate::ir::op::add::AddOp;
     use crate::ir::op::tensor_view::{TensorViewOp, ViewType};
     use crate::ir::op::NodeOp;
-    use crate::tensor::{shape::Shape, tensor::Tensor};
+    use crate::tensor::{shape::Shape};
 
     use super::{ModelCircuit, ModelParameters};
 
