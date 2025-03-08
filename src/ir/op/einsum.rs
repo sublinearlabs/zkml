@@ -215,7 +215,7 @@ fn prod_vars<Builder: RootAPI<T>, T: Config>(
 
 #[cfg(test)]
 mod tests {
-    use crate::ir::ops::einsum::{einsum, EinsumOp, EinsumParams};
+    use crate::ir::op::einsum::{einsum, EinsumOp, EinsumParams};
     use crate::tensor::shape::Shape;
     use crate::tensor::tensor::Tensor;
     use expander_compiler::declare_circuit;

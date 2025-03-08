@@ -1,4 +1,4 @@
-use crate::ir::Ops;
+use crate::ir::NodeOp;
 
 #[derive(Debug)]
 /// Circuit friendly representation of some ML computational graph
@@ -11,7 +11,7 @@ pub(crate) struct IR {
     /// node id's for output nodes
     output_ids: Vec<usize>,
     /// Flattened representation of the computational graph
-    ops: Vec<Ops>,
+    ops: Vec<NodeOp>,
 }
 
 impl IR {
@@ -20,7 +20,7 @@ impl IR {
         input_count: usize,
         constants: Vec<f32>,
         output_ids: Vec<usize>,
-        ops: Vec<Ops>,
+        ops: Vec<NodeOp>,
     ) -> Self {
         IR {
             input_count,

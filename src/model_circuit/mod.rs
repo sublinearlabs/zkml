@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::ir::ops::Ops;
+use crate::ir::op::NodeOp;
 use expander_compiler::{
     declare_circuit,
     field::M31,
@@ -15,7 +15,7 @@ struct ModelParameters {
     output_len: usize,
 
     weights: Vec<Tensor<M31>>,
-    ops: Vec<Ops>,
+    ops: Vec<NodeOp>,
 
     input: Vec<M31>,
     output: Vec<M31>,
@@ -25,7 +25,7 @@ declare_circuit!(_ModelCircuit {
     input: [Variable],
     output: [Variable],
     weights: [[Variable]],
-    ops: [Ops],
+    ops: [NodeOp],
 });
 
 type ModelCircuit = _ModelCircuit<Variable>;
@@ -47,7 +47,7 @@ impl ModelCircuit {
         new_circuit
             .weights
             .resize(params.weights.len(), vec![Variable::default()]);
-        new_circuit.ops.resize(params.ops.len(), Ops::Unknown);
+        new_circuit.ops.resize(params.ops.len(), NodeOp::Unknown);
 
         for i in 0..params.ops.len() {
             new_circuit.ops[i] = params.ops[i].clone();
@@ -68,7 +68,7 @@ impl ModelCircuit {
         new_assignment
             .weights
             .resize(params.weights.len(), vec![M31::default()]);
-        new_assignment.ops.resize(params.ops.len(), Ops::Unknown);
+        new_assignment.ops.resize(params.ops.len(), NodeOp::Unknown);
 
         for i in 0..params.weights.len() {
             new_assignment.weights[i] = params.weights[i].data.clone();
@@ -120,9 +120,9 @@ mod tests {
         frontend::{compile, CompileResult, M31Config},
     };
 
-    use crate::ir::ops::add::AddOp;
-    use crate::ir::ops::tensor_view::{TensorViewOp, ViewType};
-    use crate::ir::ops::Ops;
+    use crate::ir::op::add::AddOp;
+    use crate::ir::op::tensor_view::{TensorViewOp, ViewType};
+    use crate::ir::op::NodeOp;
     use crate::tensor::{shape::Shape, tensor::Tensor};
 
     use super::{ModelCircuit, ModelParameters};
@@ -139,13 +139,13 @@ mod tests {
             input: vec![M31::from(5)],
             output: vec![M31::from(10)],
             ops: vec![
-                Ops::TensorView(TensorViewOp {
+                NodeOp::TensorView(TensorViewOp {
                     id: 0,
                     tensor_type: ViewType::Input,
                     start_index: 0,
                     shape: Shape::new(vec![1, 1]),
                 }),
-                Ops::Add(AddOp {
+                NodeOp::Add(AddOp {
                     id: 5,
                     lhs_id: 0,
                     rhs_id: 0,

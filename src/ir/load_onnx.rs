@@ -5,10 +5,10 @@ use tract_core::internal::tract_itertools::Itertools;
 use tract_core::ops::{einsum::EinSum, konst::Const};
 
 use crate::ir::intermediate_representation::IR;
-use crate::ir::ops::add::AddOp;
-use crate::ir::ops::einsum::EinsumOp;
-use crate::ir::ops::tensor_view::{TensorViewOp, ViewType};
-use crate::ir::ops::Ops;
+use crate::ir::op::add::AddOp;
+use crate::ir::op::einsum::EinsumOp;
+use crate::ir::op::tensor_view::{TensorViewOp, ViewType};
+use crate::ir::op::NodeOp;
 use crate::tensor::shape::Shape;
 use tract_onnx::prelude::*;
 
@@ -54,10 +54,10 @@ pub(crate) fn model_graph_to_ir(model_graph: &Graph<TypedFact, Box<dyn TypedOp>>
     IR::new(input_count, constants, output_ids, ops)
 }
 
-fn parse_source<F: Fact, O: Debug>(node: &Node<F, O>, input_index: &mut usize) -> Ops {
+fn parse_source<F: Fact, O: Debug>(node: &Node<F, O>, input_index: &mut usize) -> NodeOp {
     let shape = tract_shape_data(&node);
     let volume = shape.volume();
-    let op = Ops::TensorView(TensorViewOp {
+    let op = NodeOp::TensorView(TensorViewOp {
         id: node.id,
         tensor_type: ViewType::Input,
         start_index: *input_index,
@@ -67,7 +67,7 @@ fn parse_source<F: Fact, O: Debug>(node: &Node<F, O>, input_index: &mut usize) -
     op
 }
 
-fn parse_const<F: Fact, O>(node: &Node<F, O>, constants: &mut Vec<f32>) -> Ops
+fn parse_const<F: Fact, O>(node: &Node<F, O>, constants: &mut Vec<f32>) -> NodeOp
 where
     O: Debug + Clone + Deref,
     O::Target: TypedOp,
@@ -92,7 +92,7 @@ where
         .expect("constant failed to convert to slice");
 
     // create op
-    let op = Ops::TensorView(TensorViewOp {
+    let op = NodeOp::TensorView(TensorViewOp {
         id: node.id,
         tensor_type: ViewType::Weights,
         start_index: constants.len(),
@@ -103,7 +103,7 @@ where
     op
 }
 
-fn parse_einsum<F: Fact, O>(node: &Node<F, O>) -> Ops
+fn parse_einsum<F: Fact, O>(node: &Node<F, O>) -> NodeOp
 where
     O: Debug + Deref,
     O::Target: TypedOp,
@@ -117,16 +117,16 @@ where
         .expect("failed to downcast op to einsum");
 
     // TODO: use to_strs() to simplify the work in the einsum circuit
-    Ops::EinSum(EinsumOp {
+    NodeOp::EinSum(EinsumOp {
         id: node.id,
         input_ids,
         instruction: einsum_op.axes.to_string(),
     })
 }
 
-fn parse_add<F: Fact, O: Debug>(node: &Node<F, O>) -> Ops {
+fn parse_add<F: Fact, O: Debug>(node: &Node<F, O>) -> NodeOp {
     let input_ids = input_ids(node);
-    Ops::Add(AddOp {
+    NodeOp::Add(AddOp {
         id: node.id,
         lhs_id: input_ids[0],
         rhs_id: input_ids[1],
