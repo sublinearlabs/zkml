@@ -15,10 +15,7 @@ use tract_core::{
     },
 };
 
-use crate::tensor::{
-    shape::{self, Shape},
-    tensor::Tensor,
-};
+use crate::tensor::{shape::Shape, tensor::Tensor};
 
 mod einsum;
 pub(crate) mod load_onnx;
@@ -121,15 +118,6 @@ pub(crate) struct Input {
     pub(crate) name: String,
 }
 
-// #[derive(Debug, Clone)]
-// pub(crate) struct Einsum {
-//     name: String,
-//     id: usize,
-//     instruction: String,
-//     input_count: usize,
-//     output_count: usize,
-// }
-
 #[derive(Debug, Clone)]
 pub enum TractOps {
     Input(TypedSource),
@@ -214,7 +202,6 @@ pub(crate) fn parse_tract_op(
                 id: op_id,
                 info: OpInfo::new(*last_input_index, shape.clone()),
                 name: constant.name().to_string(),
-                // data: constant.0,
             });
             *last_input_index += shape.volume();
             res
