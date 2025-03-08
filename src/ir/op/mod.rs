@@ -1,6 +1,9 @@
 use crate::ir::op::add::AddOp;
 use crate::ir::op::einsum::EinsumOp;
 use crate::ir::op::tensor_view::TensorViewOp;
+use crate::tensor::tensor::Tensor;
+use expander_compiler::frontend::{Config, RootAPI, Variable};
+use std::collections::HashMap;
 
 pub(crate) mod add;
 pub(crate) mod einsum;
@@ -22,5 +25,19 @@ impl NodeOp {
             NodeOp::EinSum(op) => op.id,
             _ => panic!("cannot get id for unsupported op"),
         }
+    }
+
+    pub(crate) fn create_circuit<C: Config, Builder: RootAPI<C>>(
+        &self,
+        api: &mut Builder,
+        history: &HashMap<usize, Tensor<Variable>>,
+        inputs: &[Variable],
+        constants: &[Variable],
+    ) -> Tensor<Variable> {
+        todo!()
+        // match &self {
+        //
+        //
+        // }
     }
 }
