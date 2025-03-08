@@ -14,6 +14,7 @@ use tract_core::{
 use crate::tensor::shape::Shape;
 
 mod einsum;
+mod intermediate_representation;
 mod load_onnx;
 
 #[derive(Debug, Clone)]
