@@ -7,6 +7,12 @@ use tract_core::internal::tract_itertools::Itertools;
 #[derive(Debug, Default, Clone)]
 pub(crate) struct EinsumOp {
     id: usize,
+    input_ids: Vec<usize>,
+    instruction: String,
+}
+
+#[derive(Debug, Default, Clone)]
+pub(crate) struct EinsumParams {
     input_str: Vec<Vec<char>>,
     output_str: Vec<char>,
     symbol_dimensions: HashMap<char, usize>,
@@ -15,7 +21,7 @@ pub(crate) struct EinsumOp {
 }
 
 impl EinsumOp {
-    fn new(id: usize, instruction: &str, input_shapes: &[Shape]) -> Self {
+    fn new(instruction: &str, input_shapes: &[Shape]) -> EinsumParams {
         let [input_insn, output_insn]: [&str; 2] = instruction
             .split("->")
             .take(2)
@@ -50,8 +56,7 @@ impl EinsumOp {
             }
         }
 
-        Self {
-            id,
+        EinsumParams {
             input_str: input_insn,
             output_str: output_insn,
             symbol_dimensions,
@@ -59,7 +64,9 @@ impl EinsumOp {
             output_shape,
         }
     }
+}
 
+impl EinsumParams {
     fn compute(&self, inputs: &[Tensor<usize>]) -> Tensor<usize> {
         let mut output_tensor = Tensor::new(None, self.output_shape.clone());
 
@@ -177,7 +184,6 @@ impl EinsumOp {
 
 fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
     let einsum_params = EinsumOp::new(
-        0,
         insn,
         inputs
             .iter()
@@ -209,7 +215,7 @@ fn prod_vars<Builder: RootAPI<T>, T: Config>(
 
 #[cfg(test)]
 mod tests {
-    use crate::ir::ops::einsum::{einsum, EinsumOp};
+    use crate::ir::ops::einsum::{einsum, EinsumOp, EinsumParams};
     use crate::tensor::shape::Shape;
     use crate::tensor::tensor::Tensor;
     use expander_compiler::declare_circuit;
@@ -298,7 +304,7 @@ mod tests {
             a: [Variable; 4],
             b: [Variable; 4],
             target: [Variable; 4],
-            einsum_params: EinsumOp
+            einsum_params: EinsumParams
         });
 
         impl Define<M31Config> for EinsumCircuit<Variable> {
@@ -315,7 +321,7 @@ mod tests {
         }
 
         impl EinsumCircuit<Variable> {
-            fn new(params: EinsumOp) -> Self {
+            fn new(params: EinsumParams) -> Self {
                 let mut circuit = Self::default();
                 circuit.einsum_params = params;
                 circuit
@@ -323,7 +329,6 @@ mod tests {
         }
 
         let params = EinsumOp::new(
-            0,
             "ij,jk->ik",
             &[Shape::new(vec![2, 2]), Shape::new(vec![2, 2])],
         );
@@ -334,7 +339,7 @@ mod tests {
             a: [M31::from(2), M31::from(3), M31::from(4), M31::from(5)],
             b: [M31::from(6), M31::from(7), M31::from(8), M31::from(9)],
             target: [M31::from(36), M31::from(41), M31::from(64), M31::from(73)],
-            einsum_params: EinsumOp::default(),
+            einsum_params: EinsumParams::default(),
         };
         let witness = compile_result
             .witness_solver
