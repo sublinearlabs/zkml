@@ -1,11 +1,11 @@
 use crate::tensor::shape::Shape;
 use crate::tensor::tensor::Tensor;
-use expander_compiler::frontend::{Config, RootAPI, Variable};
-use std::collections::{BTreeSet, HashMap};
+use expander_compiler::frontend::{Config, Define, RootAPI, Variable};
+use std::collections::HashMap;
 use tract_core::internal::tract_itertools::Itertools;
 
-#[derive(Clone, Debug, Default)]
-struct EinSum {
+#[derive(Debug, Default, Clone)]
+pub(crate) struct EinsumOp {
     input_str: Vec<Vec<char>>,
     output_str: Vec<char>,
     symbol_dimensions: HashMap<char, usize>,
@@ -13,7 +13,7 @@ struct EinSum {
     output_shape: Shape,
 }
 
-impl EinSum {
+impl EinsumOp {
     fn new(instruction: &str, input_shapes: &[Shape]) -> Self {
         let [input_insn, output_insn]: [&str; 2] = instruction
             .split("->")
@@ -174,7 +174,7 @@ impl EinSum {
 }
 
 fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
-    let einsum_params = EinSum::new(
+    let einsum_params = EinsumOp::new(
         insn,
         inputs
             .iter()
@@ -186,7 +186,6 @@ fn einsum(insn: &str, inputs: &[Tensor<usize>]) -> Tensor<usize> {
 }
 
 fn sum_vars<Builder: RootAPI<T>, T: Config>(builder: &mut Builder, input: &[Variable]) -> Variable {
-    // TODO: add proper error handling
     input
         .iter()
         .cloned()
@@ -198,7 +197,6 @@ fn prod_vars<Builder: RootAPI<T>, T: Config>(
     builder: &mut Builder,
     input: &[Variable],
 ) -> Variable {
-    // TODO: add proper error handling
     input
         .iter()
         .cloned()
@@ -208,13 +206,14 @@ fn prod_vars<Builder: RootAPI<T>, T: Config>(
 
 #[cfg(test)]
 mod tests {
-    use crate::supported_ops::einsum::{einsum, EinSum};
+    use crate::ir::ops::einsum::{einsum, EinsumOp};
     use crate::tensor::shape::Shape;
     use crate::tensor::tensor::Tensor;
-    use expander_compiler::compile::CompileOptions;
     use expander_compiler::declare_circuit;
     use expander_compiler::field::M31;
-    use expander_compiler::frontend::{compile, Define, M31Config, RootAPI, Variable};
+    use expander_compiler::frontend::{
+        compile, CompileOptions, Define, M31Config, RootAPI, Variable,
+    };
 
     #[test]
     fn test_einsum() {
@@ -296,7 +295,7 @@ mod tests {
             a: [Variable; 4],
             b: [Variable; 4],
             target: [Variable; 4],
-            einsum_params: EinSum
+            einsum_params: EinsumOp
         });
 
         impl Define<M31Config> for EinsumCircuit<Variable> {
@@ -313,14 +312,14 @@ mod tests {
         }
 
         impl EinsumCircuit<Variable> {
-            fn new(params: EinSum) -> Self {
+            fn new(params: EinsumOp) -> Self {
                 let mut circuit = Self::default();
                 circuit.einsum_params = params;
                 circuit
             }
         }
 
-        let params = EinSum::new(
+        let params = EinsumOp::new(
             "ij,jk->ik",
             &[Shape::new(vec![2, 2]), Shape::new(vec![2, 2])],
         );
@@ -331,7 +330,7 @@ mod tests {
             a: [M31::from(2), M31::from(3), M31::from(4), M31::from(5)],
             b: [M31::from(6), M31::from(7), M31::from(8), M31::from(9)],
             target: [M31::from(36), M31::from(41), M31::from(64), M31::from(73)],
-            einsum_params: EinSum::default(),
+            einsum_params: EinsumOp::default(),
         };
         let witness = compile_result
             .witness_solver

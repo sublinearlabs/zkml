@@ -1,7 +1,7 @@
 // TODO: get rid of this
 #![feature(inherent_associated_types)]
 
+mod ir;
 mod model_circuit;
 mod quantization;
-mod supported_ops;
 pub(crate) mod tensor;

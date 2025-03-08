@@ -1,4 +1,4 @@
-use crate::supported_ops::SupportedOps;
+use crate::ir::Ops;
 
 /// Circuit friendly representation of some ML computational graph
 struct IR {
@@ -10,6 +10,5 @@ struct IR {
     /// node id's for output nodes
     output_ids: Vec<usize>,
     /// Flattened representation of the computational graph
-    ops: Vec<SupportedOps>,
+    ops: Vec<Ops>,
 }
-
