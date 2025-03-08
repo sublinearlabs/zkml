@@ -2,9 +2,10 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::path::PathBuf;
 use tract_core::internal::tract_itertools::Itertools;
-use tract_core::ops::konst::Const;
+use tract_core::ops::{einsum::EinSum, konst::Const};
 
 use crate::ir::intermediate_representation::IR;
+use crate::ir::ops::einsum::EinsumOp;
 use crate::ir::ops::tensor_view::{TensorViewOp, ViewType};
 use crate::ir::ops::Ops;
 use crate::tensor::shape::Shape;
@@ -43,7 +44,7 @@ pub(crate) fn model_graph_to_ir(model_graph: &Graph<TypedFact, Box<dyn TypedOp>>
         let op = match node.op.name().as_ref() {
             "Source" => parse_source(node, &mut input_count),
             "Const" => parse_const(node, &mut constants),
-            "Einsum" => parse_einsum(node),
+            "EinSum" => parse_einsum(node),
             unknown_op => panic!("unsupported node: {}", unknown_op),
         };
         dbg!(&op);
@@ -101,8 +102,33 @@ where
     op
 }
 
-fn parse_einsum<F: Fact, O>(node: &Node<F, O>) -> Ops {
-    todo!()
+fn parse_einsum<F: Fact, O>(node: &Node<F, O>) -> Ops
+where
+    O: Debug + Deref,
+    O::Target: TypedOp,
+{
+    let input_ids = node
+        .inputs
+        .iter()
+        .map(|inlet| {
+            // handling nodes with just one output so inlet slot should always be 0
+            assert_eq!(inlet.slot, 0, "encountered inlet slot != 0");
+            inlet.node
+        })
+        .collect_vec();
+    let einsum_op = &node
+        .op
+        .as_typed()
+        .expect("op should implement typed")
+        .downcast_ref::<EinSum>()
+        .expect("failed to downcast op to einsum");
+
+    // TODO: use to_strs() to simplify the work in the einsum circuit
+    Ops::EinSum(EinsumOp {
+        id: node.id,
+        input_ids,
+        instruction: einsum_op.axes.to_string(),
+    })
 }
 
 fn tract_shape_data<F: Fact, O: Debug>(node: &Node<F, O>) -> Shape {

@@ -6,9 +6,9 @@ use tract_core::internal::tract_itertools::Itertools;
 
 #[derive(Debug, Default, Clone)]
 pub(crate) struct EinsumOp {
-    id: usize,
-    input_ids: Vec<usize>,
-    instruction: String,
+    pub(crate) id: usize,
+    pub(crate) input_ids: Vec<usize>,
+    pub(crate) instruction: String,
 }
 
 #[derive(Debug, Default, Clone)]
