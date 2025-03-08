@@ -33,12 +33,11 @@ pub(crate) fn model_graph_to_ir(
 
 #[cfg(test)]
 mod tests {
-
     use super::{load_onnx, model_graph_to_ir};
-
     #[test]
     fn test_load_onnx() {
-        let model_graph = load_onnx("models/test_onnx_model.onnx".into());
+        let model_graph = load_onnx("models/linear_regression.onnx".into());
+        dbg!(&model_graph);
         let _ = model_graph_to_ir(&model_graph);
     }
 }
