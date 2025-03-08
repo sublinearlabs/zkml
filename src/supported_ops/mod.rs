@@ -23,11 +23,11 @@ mod einsum;
 pub(crate) mod load_onnx;
 
 #[derive(Debug, Clone)]
-struct OpInfo {
+pub(crate) struct OpInfo {
     // Index where the Ops data starts in the input data
-    start_index: usize,
+    pub(crate) start_index: usize,
     // Shape of the input
-    shape: Shape,
+    pub(crate) shape: Shape,
 }
 
 impl OpInfo {
@@ -49,17 +49,26 @@ impl SupportedOps {
     pub(crate) fn create_circuit<C: Config, Builder: RootAPI<C>>(
         &self,
         api: &mut Builder,
-        history: &HashMap<usize, Vec<Variable>>,
-        input_value: &Vec<Variable>,
+        history: &HashMap<usize, Tensor<Variable>>,
+        input_value: &Vec<Vec<Variable>>,
     ) -> Tensor<Variable> {
         match self {
             SupportedOps::Add(supported_add) => {
-                let c = api.add(
-                    input_value[supported_add.input_a_id],
-                    input_value[supported_add.input_b_id],
+                let lhs = history.get(&supported_add.lhs_id).unwrap();
+                let rhs = history.get(&supported_add.rhs_id).unwrap();
+
+                api.assert_is_equal(
+                    C::CircuitField::from(lhs.shape.volume() as u32),
+                    C::CircuitField::from(rhs.shape.volume() as u32),
                 );
-                // TODO: calculate appropriate shape
-                Tensor::new(Some(vec![c]), Shape::new(vec![1]))
+
+                let mut res_data = vec![];
+
+                for i in 0..lhs.shape.volume() {
+                    res_data.push(api.add(lhs.data[i], rhs.data[i]))
+                }
+
+                Tensor::new(Some(res_data), lhs.shape.clone())
             }
             SupportedOps::Constant(constant) => todo!(),
             SupportedOps::Input(input) => todo!(),
@@ -83,8 +92,8 @@ impl SupportedOps {
 pub(crate) struct SupportedAdd {
     pub(crate) id: usize,
     pub(crate) name: String,
-    pub(crate) input_a_id: usize,
-    pub(crate) input_b_id: usize,
+    pub(crate) lhs_id: usize,
+    pub(crate) rhs_id: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -97,9 +106,9 @@ pub(crate) struct Constant {
 
 #[derive(Debug, Clone)]
 pub(crate) struct Input {
-    id: usize,
-    info: OpInfo,
-    name: String,
+    pub(crate) id: usize,
+    pub(crate) info: OpInfo,
+    pub(crate) name: String,
 }
 
 #[derive(Debug, Clone)]
@@ -208,8 +217,8 @@ pub(crate) fn parse_tract_op(
                     name: add.name().to_string(),
                     // todo!(): FIX
                     // Fetch info from tract
-                    input_a_id: 0,
-                    input_b_id: 1,
+                    lhs_id: todo!(),
+                    rhs_id: todo!(),
                 }),
                 _ => SupportedOps::Unknown,
             }

@@ -1,6 +1,6 @@
 use crate::tensor::shape::Shape;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 /// Flat representation of an n-dimensional tensor
 pub(crate) struct Tensor<T> {
     pub(crate) data: Vec<T>,
