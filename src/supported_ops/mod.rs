@@ -1,17 +1,24 @@
+use expander_compiler::{
+    field::FieldArith,
+    frontend::{Config, RootAPI},
+};
 use tract_core::{
     internal::DimLike,
+    model::ShapeFact,
     ops::{
-        binary::TypedBinOp,
+        binary::{BinMiniOp, TypedBinOp},
         einsum::EinSum,
         konst::Const,
         math::{Add, Sub},
         source::TypedSource,
-        TypedOp,
+        Op, TypedOp,
     },
-    prelude::*,
 };
 
-use crate::tensor::shape::Shape;
+use crate::tensor::{
+    shape::{self, Shape},
+    tensor::Tensor,
+};
 
 pub(crate) mod load_onnx;
 
@@ -38,6 +45,35 @@ pub(crate) enum SupportedOps {
     Unknown,
 }
 
+impl SupportedOps {
+    pub(crate) fn create_circuit<C: Config, Builder: RootAPI<C>>(
+        &self,
+        api: &mut Builder,
+    ) -> Tensor<C::CircuitField> {
+        dbg!(&self);
+        match self {
+            SupportedOps::Add(supported_add) => {
+                dbg!("Trying to create circuit");
+                Tensor::new(Some(vec![C::CircuitField::zero()]), Shape::new(vec![1]))
+            }
+            SupportedOps::Constant(constant) => todo!(),
+            SupportedOps::Input(input) => todo!(),
+            SupportedOps::EinSum(einsum) => todo!(),
+            SupportedOps::Unknown => todo!(),
+        }
+    }
+
+    pub(crate) fn get_op_id(&self) -> usize {
+        match self {
+            SupportedOps::Add(supported_add) => supported_add.id,
+            SupportedOps::Constant(constant) => constant.id,
+            SupportedOps::Input(input) => input.id,
+            SupportedOps::EinSum(einsum) => einsum.id,
+            SupportedOps::Unknown => panic!("Failed trying to get Id for Unknown Op"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub(crate) struct SupportedAdd {
     pub(crate) id: usize,
@@ -49,7 +85,7 @@ pub(crate) struct Constant {
     id: usize,
     info: OpInfo,
     name: String,
-    data: Arc<Tensor>,
+    // data: Tensor<>,
 }
 
 #[derive(Debug, Clone)]
@@ -107,13 +143,13 @@ pub enum TractBinaryOps {
     Unknown,
 }
 
-impl From<TypedBinOp> for TractBinaryOps {
-    fn from(value: TypedBinOp) -> Self {
-        if let Some(res) = value.0.downcast_ref::<Add>() {
+impl From<Box<dyn BinMiniOp>> for TractBinaryOps {
+    fn from(value: Box<dyn BinMiniOp>) -> Self {
+        if let Some(res) = value.downcast_ref::<Add>() {
             return TractBinaryOps::Add(res.clone());
         };
 
-        if let Some(res) = value.0.downcast_ref::<Sub>() {
+        if let Some(res) = value.downcast_ref::<Sub>() {
             return TractBinaryOps::Sub(res.clone());
         };
 
@@ -151,25 +187,22 @@ pub(crate) fn parse_tract_op(
                 id: op_id,
                 info: OpInfo::new(*last_input_index, shape.clone()),
                 name: constant.name().to_string(),
-                data: constant.0,
+                // data: constant.0,
             });
             *last_input_index += shape.volume();
             res
         }
-        // TractOps::Binary(typed_bin_op) => {
-        //     let supported_bin_op = typed_bin_op
-        //         .0
-        //         .downcast_ref::<TractBinaryOps>()
-        //         .unwrap();
+        TractOps::Binary(typed_bin_op) => {
+            let supported_bin_op: TractBinaryOps = typed_bin_op.0.into();
 
-        //     match supported_bin_op {
-        //         TractBinaryOps::Add(add) => SupportedOps::Add(SupportedAdd {
-        //             id: op_id,
-        //             name: add.name().to_string(),
-        //         }),
-        //         _ => SupportedOps::Unknown,
-        //     }
-        // }
+            match supported_bin_op {
+                TractBinaryOps::Add(add) => SupportedOps::Add(SupportedAdd {
+                    id: op_id,
+                    name: add.name().to_string(),
+                }),
+                _ => SupportedOps::Unknown,
+            }
+        }
         _ => SupportedOps::Unknown,
     };
     res
