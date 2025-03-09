@@ -10,8 +10,15 @@ use zkml::quantization::quantizer::Quantizer;
 
 const X_MEAN: f32 = 49.5;
 const X_STD: f32 = 28.86607004772212;
+const Y_MEAN: f32 = 145.0;
+const Y_STD: f32 = 57.73214009544424;
+
 fn normalize(x: f32) -> f32 {
     (x - X_MEAN) / X_STD
+}
+
+fn denormalize(y: f32) -> f32 {
+    y * Y_STD + Y_MEAN
 }
 
 fn hex_to_bn254(hex_str: &str) -> BN254 {
@@ -28,6 +35,7 @@ fn main() {
 
     let output_hex = "22769f827e728891563c62f5ced0eebf300e9f90057859b3e4391f15e07054b1";
     let output = vec![hex_to_bn254(output_hex)];
+    let result = output.iter().map(|v| denormalize(quantizer.dequantize(v))).collect_vec();
 
     let build_result = compile_circuit(
         "models/linear_regression.onnx".into(),
@@ -35,6 +43,8 @@ fn main() {
         output,
         &quantizer,
     );
+
+    dbg!(&result);
 
     // let witness = build_result.compile_result.witness_solver.solve_witness(&build_result.assignment).unwrap();
     // let run_result = build_result.compile_result.layered_circuit.run(&witness);
