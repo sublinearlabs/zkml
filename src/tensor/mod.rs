@@ -1,3 +1,3 @@
-pub(crate) mod shape;
+pub mod shape;
 pub(crate) mod shape_indices;
-pub(crate) mod tensor;
+pub mod tensor;

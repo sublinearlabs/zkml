@@ -11,17 +11,17 @@ use expander_compiler::{
 use crate::tensor::tensor::Tensor;
 
 #[derive(Debug, Clone)]
-pub(crate) struct ModelParameters {
-    pub(crate) input_len: usize,
-    pub(crate) output_len: usize,
+pub struct ModelParameters {
+    pub input_len: usize,
+    pub output_len: usize,
 
-    pub(crate) weights: Vec<BN254>,
-    pub(crate) ops: Vec<NodeOp>,
+    pub weights: Vec<BN254>,
+    pub ops: Vec<NodeOp>,
 
-    pub(crate) input: Vec<BN254>,
-    pub(crate) output: Vec<BN254>,
+    pub input: Vec<BN254>,
+    pub output: Vec<BN254>,
 
-    pub(crate) scale_inv: BN254,
+    pub scale_inv: BN254,
 }
 
 declare_circuit!(_ModelCircuit {
@@ -32,7 +32,7 @@ declare_circuit!(_ModelCircuit {
     ops: [NodeOp],
 });
 
-pub(crate) type ModelCircuit = _ModelCircuit<Variable>;
+pub type ModelCircuit = _ModelCircuit<Variable>;
 
 impl ModelCircuit {
     pub(crate) fn new_circuit(params: &ModelParameters) -> Self {
@@ -58,7 +58,7 @@ impl ModelCircuit {
 
     // TODO: refactor this to only take what it needs
     //  consider assignment parameters
-    fn new_assignment(params: &ModelParameters) -> _ModelCircuit<BN254> {
+    pub fn new_assignment(params: &ModelParameters) -> _ModelCircuit<BN254> {
         let mut new_assignment = _ModelCircuit::<BN254>::default();
 
         new_assignment

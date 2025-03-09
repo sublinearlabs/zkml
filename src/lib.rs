@@ -1,5 +1,5 @@
-mod cmd;
+pub mod cmd;
 mod ir;
-mod model_circuit;
-mod quantization;
-pub(crate) mod tensor;
+pub mod model_circuit;
+pub mod quantization;
+pub mod tensor;

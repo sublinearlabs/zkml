@@ -1,2 +1,2 @@
-pub(crate) mod quantized_float;
-pub(crate) mod quantizer;
+pub mod quantized_float;
+pub mod quantizer;

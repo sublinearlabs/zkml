@@ -6,7 +6,7 @@ pub(crate) struct QuantizedFloat(Variable);
 
 impl QuantizedFloat {
     /// Instantiate a new quantized float from a variable
-    pub(crate) fn new(var: Variable) -> Self {
+    pub fn new(var: Variable) -> Self {
         Self(var)
     }
 

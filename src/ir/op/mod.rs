@@ -11,7 +11,7 @@ pub(crate) mod einsum;
 pub(crate) mod tensor_view;
 
 #[derive(Debug, Clone)]
-pub(crate) enum NodeOp {
+pub enum NodeOp {
     Add(AddOp),
     TensorView(TensorViewOp),
     EinSum(EinsumOp),

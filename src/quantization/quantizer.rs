@@ -1,12 +1,12 @@
 use expander_compiler::field::BN254;
 
 /// N represents the number of fractional bits for the fixed point representation
-pub(crate) struct Quantizer<const N: u8> {}
+pub struct Quantizer<const N: u8> {}
 
 impl<const N: u8> Quantizer<N> {
     /// Converts an f32 value into signed fixed point representation and represent that
     /// value in a field
-    pub(crate) fn quantize(&self, value: f32) -> BN254 {
+    pub fn quantize(&self, value: f32) -> BN254 {
         let mut scaled_float = value * (1 << N) as f32;
 
         // to minimize quantization error from granularity g to g/2
@@ -26,7 +26,7 @@ impl<const N: u8> Quantizer<N> {
     }
 
     /// Converts a field representation of a fixed point value to the equivalent f32 value
-    pub(crate) fn dequantize(&self, value: &BN254) -> f32 {
+    pub fn dequantize(&self, value: &BN254) -> f32 {
         let mut lower_u32 = [0; 4];
         lower_u32.copy_from_slice(&value.to_bytes()[0..4]);
         i32::from_le_bytes(lower_u32) as f32 / (1 << N) as f32

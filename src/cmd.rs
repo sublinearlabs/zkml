@@ -4,7 +4,7 @@ use expander_compiler::field::{FieldArith, BN254};
 use expander_compiler::frontend::{compile, BN254Config, CompileOptions, CompileResult};
 use std::path::PathBuf;
 
-fn compile_circuit(path: PathBuf) -> CompileResult<BN254Config> {
+pub fn compile_circuit(path: PathBuf) -> CompileResult<BN254Config> {
     const FRACTIONAL_BITS: u8 = 15;
     let tract_graph = load_onnx(path);
     let ir = model_graph_to_ir(&tract_graph);
