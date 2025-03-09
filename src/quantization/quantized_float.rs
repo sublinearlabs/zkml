@@ -26,8 +26,9 @@ impl QuantizedFloat {
         let acc_mul = api.mul(self.0, b.0);
         // rescale
         // TODO: constraint this once we have range checks
-        //  first conver
-        // let rescaled_mul = api.unconstrained_shift_r(acc_mul, shift);
+        //  for a / b
+        //      a = b * q + r
+        //      0 <= r < b
         let rescaled_mul = api.unconstrained_int_div(acc_mul, shift);
         QuantizedFloat(rescaled_mul)
     }
