@@ -63,6 +63,7 @@ fn field_to_i32(val: &BN254) -> i32 {
 #[cfg(test)]
 mod tests {
     use crate::quantization::quantizer::{field_to_i32, i32_to_field, Quantizer};
+    use expander_compiler::field::{FieldModulus, BN254};
 
     #[test]
     fn test_i32_as_u32_same_bit_pattern() {
@@ -113,5 +114,10 @@ mod tests {
         let b = i32_to_field(-50);
         let c = a * b;
         assert_eq!(field_to_i32(&c), 22250);
+
+        let a = i32_to_field(3392);
+        let b = i32_to_field(-5152);
+        let c = a * b;
+        assert_eq!(field_to_i32(&c), -17475584);
     }
 }
