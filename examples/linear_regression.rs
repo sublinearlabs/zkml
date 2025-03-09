@@ -1,4 +1,4 @@
-use expander_compiler::field::{BN254, FieldArith};
+use expander_compiler::field::{FieldArith, BN254};
 use expander_compiler::frontend::extra::debug_eval;
 use expander_compiler::frontend::{BN254Config, EmptyHintCaller, Variable};
 use tract_core::internal::tract_itertools::Itertools;
@@ -22,7 +22,14 @@ fn denormalize(y: f32) -> f32 {
 }
 
 fn hex_to_bn254(hex_str: &str) -> BN254 {
-    let bytes: [u8; 32] = hex::decode(hex_str).unwrap().iter().cloned().rev().collect_vec().try_into().unwrap();
+    let bytes: [u8; 32] = hex::decode(hex_str)
+        .unwrap()
+        .iter()
+        .cloned()
+        .rev()
+        .collect_vec()
+        .try_into()
+        .unwrap();
     BN254::from_bytes(&bytes).unwrap()
 }
 
@@ -33,9 +40,12 @@ fn main() {
     let quantizer = Quantizer::<16> {};
     let input = vec![quantizer.quantize(x)];
 
-    let output_hex = "22769f827e728891563c62f5ced0eebf300e9f90057859b3e4391f15e07054b1";
+    let output_hex = "00000000000000000000000000000000000000000000000000000000000166d6";
     let output = vec![hex_to_bn254(output_hex)];
-    let result = output.iter().map(|v| denormalize(quantizer.dequantize(v))).collect_vec();
+    let result = output
+        .iter()
+        .map(|v| denormalize(quantizer.dequantize(v)))
+        .collect_vec();
 
     let build_result = compile_circuit(
         "models/linear_regression.onnx".into(),
@@ -43,16 +53,19 @@ fn main() {
         output,
         &quantizer,
     );
+    println!("output: {}", result[0]);
 
-    dbg!(&result);
+    let witness = build_result
+        .compile_result
+        .witness_solver
+        .solve_witness(&build_result.assignment)
+        .unwrap();
+    let run_result = build_result.compile_result.layered_circuit.run(&witness);
+    assert!(run_result.iter().all(|v| *v));
 
-    // let witness = build_result.compile_result.witness_solver.solve_witness(&build_result.assignment).unwrap();
-    // let run_result = build_result.compile_result.layered_circuit.run(&witness);
-    // dbg!(&run_result);
-
-    debug_eval::<BN254Config, _ModelCircuit<Variable>, _ModelCircuit<BN254>, EmptyHintCaller>(
-        &build_result.model,
-        &build_result.assignment,
-        EmptyHintCaller::new(),
-    );
+    // debug_eval::<BN254Config, _ModelCircuit<Variable>, _ModelCircuit<BN254>, EmptyHintCaller>(
+    //     &build_result.model,
+    //     &build_result.assignment,
+    //     EmptyHintCaller::new(),
+    // );
 }
