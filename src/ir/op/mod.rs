@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 pub(crate) mod add;
 pub(crate) mod einsum;
+pub(crate) mod relu;
 pub(crate) mod tensor_view;
 
 #[derive(Debug, Clone)]

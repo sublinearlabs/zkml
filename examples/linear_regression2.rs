@@ -2,24 +2,12 @@ use expander_compiler::field::{FieldArith, BN254};
 use expander_compiler::frontend::extra::debug_eval;
 use expander_compiler::frontend::{BN254Config, EmptyHintCaller, Variable};
 use tract_core::internal::tract_itertools::Itertools;
+use tract_core::num_traits::ToPrimitive;
 use zkml::cmd::compile_circuit;
 use zkml::model_circuit::_ModelCircuit;
 use zkml::quantization::quantizer::Quantizer;
 
-// this model tries to estimate 2 * norm_x + 46
-
-const X_MEAN: f32 = 49.5;
-const X_STD: f32 = 28.86607004772212;
-const Y_MEAN: f32 = 145.0;
-const Y_STD: f32 = 57.73214009544424;
-
-fn normalize(x: f32) -> f32 {
-    (x - X_MEAN) / X_STD
-}
-
-fn denormalize(y: f32) -> f32 {
-    y * Y_STD + Y_MEAN
-}
+// This model is trained on the california housing dataset from sklearn
 
 fn hex_to_bn254(hex_str: &str) -> BN254 {
     let bytes: [u8; 32] = hex::decode(hex_str)
@@ -34,27 +22,34 @@ fn hex_to_bn254(hex_str: &str) -> BN254 {
 }
 
 fn main() {
-    // run model with x = [90], expected_result ~= 226
-    let x = normalize(90.0);
+    // Model input:
+    // x = [-1.1551, -0.2863, -0.5207, -0.1717, -0.0303,  0.0674,  0.1951,  0.2853],
+    // Expected_output
+    // expected_out ~= [-0.0457]
+
+    let x = vec![
+        -1.1551, -0.2863, -0.5207, -0.1717, -0.0303, 0.0674, 0.1951, 0.2853,
+    ];
 
     let quantizer = Quantizer::<16> {};
-    let input = vec![quantizer.quantize(x)];
+    let input = x.iter().map(|val| quantizer.quantize(*val)).collect();
 
-    let output_hex = "187e5520ef715133fdd54938ff0e8accaec03ddae6f45734d69ed77f8fe43342";
+    // TODO: output hex
+    let output_hex = "22769f827e728891563c62f5ced0eebf300e9f90057859b3e4391f15e07054b1";
     let output = vec![hex_to_bn254(output_hex)];
-    let result = output
-        .iter()
-        .map(|v| denormalize(quantizer.dequantize(v)))
-        .collect_vec();
+
+    let result = output.iter().map(|v| quantizer.dequantize(v)).collect_vec();
+
+    dbg!(&result);
 
     let build_result = compile_circuit(
-        "../models/linear_regression.onnx".into(),
+        "../models/linear_regression2.onnx".into(),
         input,
         output,
         &quantizer,
     );
 
-    dbg!(&result);
+    dbg!(&build_result.assignment.input);
 
     // let witness = build_result.compile_result.witness_solver.solve_witness(&build_result.assignment).unwrap();
     // let run_result = build_result.compile_result.layered_circuit.run(&witness);
@@ -66,3 +61,6 @@ fn main() {
         EmptyHintCaller::new(),
     );
 }
+
+// cargo run --package zkml --example linear_regression2
+// -1.1551 * -0.2863 = 0.33070513

@@ -63,6 +63,7 @@ impl EinsumOp {
             }
         }
 
+        println!("{}", instruction);
         // determine the output shape
         let output_shape = Shape::new(output_insn.iter().map(|c| symbol_dimensions[c]).collect());
 
