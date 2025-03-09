@@ -19,21 +19,15 @@ impl<const N: u8> Quantizer<N> {
             scaled_float -= 0.5
         }
 
-        // first convert to i32 to handle sign extension then convert to u32
-        // bit pattern is preserved see `test_i32_as_u32_same_bit_pattern`
-        let fixed_rep = (scaled_float as i32) as u32;
-
-        BN254::from(fixed_rep)
+        i32_to_field(scaled_float as i32)
     }
 
     /// Converts a field representation of a fixed point value to the equivalent f32 value
     pub fn dequantize(&self, value: &BN254) -> f32 {
-        let mut lower_u32 = [0; 4];
-        lower_u32.copy_from_slice(&value.to_bytes()[0..4]);
-        i32::from_le_bytes(lower_u32) as f32 / (1 << N) as f32
+        field_to_i32(&value) as f32 / self.scale() as f32
     }
 
-    pub fn scale(&self) -> u32 {
+    pub const fn scale(&self) -> u32 {
         1 << N
     }
 }
