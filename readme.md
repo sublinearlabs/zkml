@@ -9,7 +9,46 @@
 // what is left
 
 
-The goal is
+### Architecture
+
+#### Simplifying ops
+- we start with the onnx model
+- and pass this to tract (https://github.com/sonos/tract/tree/main)
+  - they strip models on training artifacts and make them extremely optimized for inference environments. 
+  - this is especially useful for us, as we just want verifiable inference.
+- next we convert the tract opcodes to our IR
+  - here we strip nodes of constants (e.g. weights, bias, ...) and push them into some flat array
+    - useful for committing to model weights
+  - we also parse any relevant instructions e.g. einsum equations
+
+  ```rust
+  pub(crate) struct AddOp {
+    pub(crate) id: usize,
+    pub(crate) lhs_id: usize,
+    pub(crate) rhs_id: usize,
+  }
+  
+  pub(crate) struct EinsumOp {
+    pub(crate) id: usize,
+    pub(crate) input_ids: Vec<usize>,
+    pub(crate) instruction: String,
+  }
+  
+  pub(crate) struct TensorViewOp {
+    pub(crate) id: usize,
+    pub(crate) tensor_type: ViewType,
+    pub(crate) start_index: usize,
+    pub(crate) shape: Shape,
+  }
+
+  #[derive(Debug, Clone)]
+  pub(crate) enum ViewType {
+    Input,
+    Weights,
+  }
+  ```
+- given our IR and the weights we can convert have methods on each op to generate a circuit
+- we do this for each IR node generating the full model circuit
 
 ### Quantization
 ML algorithms use floating point numbers for their computations. ZK circuits make use of fields. We needed a way to represent floating point numbers in the field while preserving computational structure. 
@@ -36,3 +75,7 @@ TODO for quantization
 
 - [ ] explore accurate floating point snarks 
   - see: (https://eprint.iacr.org/2024/1842.pdf)
+
+### What is next?
+- [ ] implement the rest of tract opcodes
+- [ ] look into tinygrad (https://github.com/tinygrad/tinygrad) as an alternative simplification backend
