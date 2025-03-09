@@ -25,7 +25,7 @@ impl QuantizedFloat {
         // multiply into accumulator
         let acc_mul = api.mul(self.0, b.0);
         // rescale
-        // TODO: constraint this once we have range checks
+        // TODO: constrain this once we have range checks
         //  for a / b
         //      a = b * q + r
         //      0 <= r < b
