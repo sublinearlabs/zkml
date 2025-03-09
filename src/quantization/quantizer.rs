@@ -1,4 +1,5 @@
-use expander_compiler::field::BN254;
+use expander_compiler::field::{FieldArith, BN254};
+use std::ops::Neg;
 
 /// N represents the number of fractional bits for the fixed point representation
 pub struct Quantizer<const N: u8> {}
@@ -34,6 +35,34 @@ impl<const N: u8> Quantizer<N> {
 
     pub fn scale(&self) -> u32 {
         1 << N
+    }
+}
+
+// TODO: add documentation
+fn i32_to_field(val: i32) -> BN254 {
+    if val >= 0 {
+        BN254::from(val as u32)
+    } else if val == i32::MIN {
+        -BN254::from(val.saturating_neg() as u32) - BN254::ONE
+    } else {
+        -BN254::from(val.neg() as u32)
+    }
+}
+
+// TODO: add documentation
+fn field_to_i32(val: &BN254) -> i32 {
+    if val > &BN254::from(i32::MAX as u32) {
+        if val == &(-BN254::from(i32::MAX as u32) - BN254::ONE) {
+            return i32::MIN;
+        }
+        let val = -val;
+        let mut lower_32 = [0; 4];
+        lower_32.copy_from_slice(&val.to_bytes()[0..4]);
+        -i32::from_le_bytes(lower_32)
+    } else {
+        let mut lower_32 = [0; 4];
+        lower_32.copy_from_slice(&val.to_bytes()[0..4]);
+        i32::from_le_bytes(lower_32)
     }
 }
 
