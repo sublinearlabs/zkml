@@ -13,7 +13,7 @@ pub(crate) struct IR {
     pub(crate) input_count: usize,
     /// contains all constants in the computational graph
     /// this includes weights, bias, ...
-    constants: Vec<f32>,
+    pub(crate) constants: Vec<f32>,
     /// node id's for output nodes
     pub(crate) output_ids: Vec<usize>,
     /// Flattened representation of the computational graph

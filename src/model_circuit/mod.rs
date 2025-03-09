@@ -14,13 +14,14 @@ use crate::tensor::tensor::Tensor;
 pub struct ModelParameters {
     pub input_len: usize,
     pub output_len: usize,
-
-    pub weights: Vec<BN254>,
+    pub weight_len: usize,
     pub ops: Vec<NodeOp>,
+}
 
-    pub input: Vec<BN254>,
-    pub output: Vec<BN254>,
-
+pub struct AssignmentParameters {
+    pub inputs: Vec<BN254>,
+    pub weights: Vec<BN254>,
+    pub outputs: Vec<BN254>,
     pub scale_inv: BN254,
 }
 
@@ -46,7 +47,7 @@ impl ModelCircuit {
             .resize(params.output_len, Variable::default());
         new_circuit
             .weights
-            .resize(params.weights.len(), Variable::default());
+            .resize(params.weight_len, Variable::default());
         new_circuit.ops.resize(params.ops.len(), NodeOp::Unknown);
 
         for i in 0..params.ops.len() {
@@ -56,34 +57,28 @@ impl ModelCircuit {
         new_circuit
     }
 
-    // TODO: refactor this to only take what it needs
-    //  consider assignment parameters
-    pub fn new_assignment(params: &ModelParameters) -> _ModelCircuit<BN254> {
+    pub fn new_assignment(params: &AssignmentParameters) -> _ModelCircuit<BN254> {
         let mut new_assignment = _ModelCircuit::<BN254>::default();
 
         new_assignment
             .input
-            .resize(params.input_len, BN254::default());
+            .resize(params.inputs.len(), BN254::default());
         new_assignment
             .output
-            .resize(params.output_len, BN254::default());
+            .resize(params.outputs.len(), BN254::default());
         new_assignment
             .weights
             .resize(params.weights.len(), BN254::default());
-        new_assignment.ops.resize(params.ops.len(), NodeOp::Unknown);
         new_assignment.scale_inv = params.scale_inv;
 
         for i in 0..params.weights.len() {
             new_assignment.weights[i] = params.weights[i];
         }
-        for i in 0..params.input.len() {
-            new_assignment.input[i] = params.input[i];
+        for i in 0..params.inputs.len() {
+            new_assignment.input[i] = params.inputs[i];
         }
-        for i in 0..params.output.len() {
-            new_assignment.output[i] = params.output[i];
-        }
-        for i in 0..params.ops.len() {
-            new_assignment.ops[i] = params.ops[i].clone();
+        for i in 0..params.outputs.len() {
+            new_assignment.output[i] = params.outputs[i];
         }
 
         new_assignment
