@@ -1,4 +1,5 @@
 ### ONNX to Expander Circuits
+This project aims to enable proving AI inference by leveraging the efficiency of the GKR protocol using the Expander Compiler Collection.
 
 - Build your ml model with your favorite tools.
 - Export as ONNX
@@ -70,6 +71,14 @@ TODO for quantization
 
 - [ ] explore accurate floating point snarks 
   - see: (https://eprint.iacr.org/2024/1842.pdf)
+
+## Example
+For sample examples, run
+
+1. Proving a basic linear regression model that predicts an output
+```rust
+    cargo run --example linear_regression
+```
 
 ### What is next?
 - [ ] implement the rest of tract opcodes
