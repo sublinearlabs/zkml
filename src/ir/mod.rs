@@ -13,7 +13,7 @@ pub(crate) struct IR {
     pub(crate) input_count: usize,
     /// contains all constants in the computational graph
     /// this includes weights, bias, ...
-    constants: Vec<f32>,
+    pub(crate) constants: Vec<f32>,
     /// node id's for output nodes
     pub(crate) output_ids: Vec<usize>,
     /// Flattened representation of the computational graph
@@ -37,8 +37,7 @@ impl IR {
     }
 
     /// Returns the IR constants in quantized form (so we can perform operations in the field)
-    pub(crate) fn quantize_constants<const N: u8>(&self) -> Vec<BN254> {
-        let quantizer = Quantizer::<N> {};
+    pub(crate) fn quantize_constants<const N: u8>(&self, quantizer: &Quantizer<N>) -> Vec<BN254> {
         self.constants
             .iter()
             .map(|c| quantizer.quantize(*c))

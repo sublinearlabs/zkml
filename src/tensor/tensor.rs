@@ -2,7 +2,7 @@ use crate::tensor::shape::Shape;
 
 #[derive(Debug, PartialEq, Clone)]
 /// Flat representation of an n-dimensional tensor
-pub(crate) struct Tensor<T> {
+pub struct Tensor<T> {
     pub(crate) data: Vec<T>,
     pub(crate) shape: Shape,
 }
@@ -11,7 +11,7 @@ impl<T: Default + Clone> Tensor<T> {
     /// Instantiates a new Tensor
     /// ensures the size of data matches the shape
     /// if no data, performs default T allocation of correct size
-    pub(crate) fn new(data: Option<Vec<T>>, shape: Shape) -> Self {
+    pub fn new(data: Option<Vec<T>>, shape: Shape) -> Self {
         let data = if let Some(data) = data {
             assert!(data.len() == shape.volume());
             data

@@ -11,17 +11,18 @@ use expander_compiler::{
 use crate::tensor::tensor::Tensor;
 
 #[derive(Debug, Clone)]
-pub(crate) struct ModelParameters {
-    pub(crate) input_len: usize,
-    pub(crate) output_len: usize,
+pub struct ModelParameters {
+    pub input_len: usize,
+    pub output_len: usize,
+    pub weight_len: usize,
+    pub ops: Vec<NodeOp>,
+}
 
-    pub(crate) weights: Vec<BN254>,
-    pub(crate) ops: Vec<NodeOp>,
-
-    pub(crate) input: Vec<BN254>,
-    pub(crate) output: Vec<BN254>,
-
-    pub(crate) scale_inv: BN254,
+pub struct AssignmentParameters {
+    pub inputs: Vec<BN254>,
+    pub weights: Vec<BN254>,
+    pub outputs: Vec<BN254>,
+    pub scale_inv: BN254,
 }
 
 declare_circuit!(_ModelCircuit {
@@ -32,7 +33,7 @@ declare_circuit!(_ModelCircuit {
     ops: [NodeOp],
 });
 
-pub(crate) type ModelCircuit = _ModelCircuit<Variable>;
+pub type ModelCircuit = _ModelCircuit<Variable>;
 
 impl ModelCircuit {
     pub(crate) fn new_circuit(params: &ModelParameters) -> Self {
@@ -46,7 +47,7 @@ impl ModelCircuit {
             .resize(params.output_len, Variable::default());
         new_circuit
             .weights
-            .resize(params.weights.len(), Variable::default());
+            .resize(params.weight_len, Variable::default());
         new_circuit.ops.resize(params.ops.len(), NodeOp::Unknown);
 
         for i in 0..params.ops.len() {
@@ -56,34 +57,28 @@ impl ModelCircuit {
         new_circuit
     }
 
-    // TODO: refactor this to only take what it needs
-    //  consider assignment parameters
-    fn new_assignment(params: &ModelParameters) -> _ModelCircuit<BN254> {
+    pub fn new_assignment(params: &AssignmentParameters) -> _ModelCircuit<BN254> {
         let mut new_assignment = _ModelCircuit::<BN254>::default();
 
         new_assignment
             .input
-            .resize(params.input_len, BN254::default());
+            .resize(params.inputs.len(), BN254::default());
         new_assignment
             .output
-            .resize(params.output_len, BN254::default());
+            .resize(params.outputs.len(), BN254::default());
         new_assignment
             .weights
             .resize(params.weights.len(), BN254::default());
-        new_assignment.ops.resize(params.ops.len(), NodeOp::Unknown);
         new_assignment.scale_inv = params.scale_inv;
 
         for i in 0..params.weights.len() {
             new_assignment.weights[i] = params.weights[i];
         }
-        for i in 0..params.input.len() {
-            new_assignment.input[i] = params.input[i];
+        for i in 0..params.inputs.len() {
+            new_assignment.input[i] = params.inputs[i];
         }
-        for i in 0..params.output.len() {
-            new_assignment.output[i] = params.output[i];
-        }
-        for i in 0..params.ops.len() {
-            new_assignment.ops[i] = params.ops[i].clone();
+        for i in 0..params.outputs.len() {
+            new_assignment.output[i] = params.outputs[i];
         }
 
         new_assignment
@@ -104,12 +99,11 @@ impl<C: Config> Define<C> for ModelCircuit {
 
         let expected = history.get(&last_circuit).unwrap();
 
-        dbg!(&history);
-        dbg!(&expected);
-        dbg!(&self.output);
-
-        // TODO: Handle multiple outputs
         for i in 0..self.output.len() {
+            api.display(
+                format!("out-{}", i).as_str(),
+                expected.data[i].clone().to_var(),
+            );
             api.assert_is_equal(expected.data[i].to_var(), self.output[i]);
         }
     }
@@ -130,18 +124,14 @@ mod tests {
     use crate::ir::op::NodeOp;
     use crate::tensor::shape::Shape;
 
-    use super::{ModelCircuit, ModelParameters};
+    use super::{AssignmentParameters, ModelCircuit, ModelParameters};
 
     #[test]
     fn test_model_circuit() {
-        let params = ModelParameters {
-            input_len: 2,
+        let model_params = ModelParameters {
+            input_len: 1,
             output_len: 1,
-            weights: vec![BN254::from(3_u64)],
-            input: vec![BN254::from(5_u64)],
-            output: vec![BN254::from(10_u64)],
-            // scale not necessary for this example
-            scale_inv: BN254::one(),
+            weight_len: 1,
             ops: vec![
                 NodeOp::TensorView(TensorViewOp {
                     id: 0,
@@ -163,13 +153,21 @@ mod tests {
             ],
         };
 
+        let assignment_params = AssignmentParameters {
+            weights: vec![BN254::from(3_u64)],
+            inputs: vec![BN254::from(5_u64)],
+            outputs: vec![BN254::from(10_u64)],
+            // scale not necessary for this example
+            scale_inv: BN254::one(),
+        };
+
         let compiled_result: CompileResult<BN254Config> = compile(
-            &ModelCircuit::new_circuit(&params),
+            &ModelCircuit::new_circuit(&model_params),
             CompileOptions::default(),
         )
         .unwrap();
 
-        let assignment = ModelCircuit::new_assignment(&params);
+        let assignment = ModelCircuit::new_assignment(&assignment_params);
 
         let witness = compiled_result
             .witness_solver
