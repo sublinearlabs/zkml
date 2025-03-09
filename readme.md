@@ -1,13 +1,8 @@
 ### ONNX to Expander Circuits
 
-// what do I want to write here?
-// we need to talk about the motivation for doing this
-// we need to talk about what success looks like
-// we need to talk about technical details
-// overall architecture
-// quantization
-// what is left
-
+- Build your ml model with your favorite tools.
+- Export as ONNX
+- Get verifiable inference
 
 ### Architecture
 
