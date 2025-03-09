@@ -8,6 +8,7 @@ use std::path::PathBuf;
 pub struct CompilationResult {
     pub compile_result: CompileResult<BN254Config>,
     pub assignment: _ModelCircuit<BN254>,
+    pub model: ModelCircuit,
 }
 
 pub fn compile_circuit<const N: u8>(
@@ -46,5 +47,6 @@ pub fn compile_circuit<const N: u8>(
     CompilationResult {
         compile_result,
         assignment,
+        model: _ModelCircuit::new_circuit(&model_params),
     }
 }

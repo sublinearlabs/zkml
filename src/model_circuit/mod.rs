@@ -99,12 +99,11 @@ impl<C: Config> Define<C> for ModelCircuit {
 
         let expected = history.get(&last_circuit).unwrap();
 
-        dbg!(&history);
-        dbg!(&expected);
-        dbg!(&self.output);
-
-        // TODO: Handle multiple outputs
         for i in 0..self.output.len() {
+            api.display(
+                format!("out-{}", i).as_str(),
+                expected.data[i].clone().to_var(),
+            );
             api.assert_is_equal(expected.data[i].to_var(), self.output[i]);
         }
     }
@@ -125,18 +124,14 @@ mod tests {
     use crate::ir::op::NodeOp;
     use crate::tensor::shape::Shape;
 
-    use super::{ModelCircuit, ModelParameters};
+    use super::{AssignmentParameters, ModelCircuit, ModelParameters};
 
     #[test]
     fn test_model_circuit() {
-        let params = ModelParameters {
-            input_len: 2,
+        let model_params = ModelParameters {
+            input_len: 1,
             output_len: 1,
-            weights: vec![BN254::from(3_u64)],
-            input: vec![BN254::from(5_u64)],
-            output: vec![BN254::from(10_u64)],
-            // scale not necessary for this example
-            scale_inv: BN254::one(),
+            weight_len: 1,
             ops: vec![
                 NodeOp::TensorView(TensorViewOp {
                     id: 0,
@@ -158,13 +153,21 @@ mod tests {
             ],
         };
 
+        let assignment_params = AssignmentParameters {
+            weights: vec![BN254::from(3_u64)],
+            inputs: vec![BN254::from(5_u64)],
+            outputs: vec![BN254::from(10_u64)],
+            // scale not necessary for this example
+            scale_inv: BN254::one(),
+        };
+
         let compiled_result: CompileResult<BN254Config> = compile(
-            &ModelCircuit::new_circuit(&params),
+            &ModelCircuit::new_circuit(&model_params),
             CompileOptions::default(),
         )
         .unwrap();
 
-        let assignment = ModelCircuit::new_assignment(&params);
+        let assignment = ModelCircuit::new_assignment(&assignment_params);
 
         let witness = compiled_result
             .witness_solver
