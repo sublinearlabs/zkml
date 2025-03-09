@@ -25,8 +25,10 @@ impl QuantizedFloat {
         // multiply into accumulator
         let acc_mul = api.mul(self.0, b.0);
         // rescale
-        // TODO: we are cheating here, we need a way to constrain this
-        let rescaled_mul = api.unconstrained_shift_r(acc_mul, shift);
+        // TODO: constraint this once we have range checks
+        //  first conver
+        // let rescaled_mul = api.unconstrained_shift_r(acc_mul, shift);
+        let rescaled_mul = api.unconstrained_int_div(acc_mul, shift);
         QuantizedFloat(rescaled_mul)
     }
 
