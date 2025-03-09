@@ -40,6 +40,7 @@ impl<const N: u8> Quantizer<N> {
 #[cfg(test)]
 mod tests {
     use crate::quantization::quantizer::Quantizer;
+    use expander_compiler::field::{FieldArith, BN254};
 
     #[test]
     fn test_i32_as_u32_same_bit_pattern() {

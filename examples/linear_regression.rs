@@ -40,7 +40,7 @@ fn main() {
     let quantizer = Quantizer::<16> {};
     let input = vec![quantizer.quantize(x)];
 
-    let output_hex = "187e5520ef715133fdd54938ff0e8accaec03ddae6f45734d69ed77f8fe43342";
+    let output_hex = "00000000000000000000000000000000000000000000000000000000000166d6";
     let output = vec![hex_to_bn254(output_hex)];
     let result = output
         .iter()
@@ -53,16 +53,19 @@ fn main() {
         output,
         &quantizer,
     );
+    println!("output: {}", result[0]);
 
-    dbg!(&result);
+    let witness = build_result
+        .compile_result
+        .witness_solver
+        .solve_witness(&build_result.assignment)
+        .unwrap();
+    let run_result = build_result.compile_result.layered_circuit.run(&witness);
+    assert!(run_result.iter().all(|v| *v));
 
-    // let witness = build_result.compile_result.witness_solver.solve_witness(&build_result.assignment).unwrap();
-    // let run_result = build_result.compile_result.layered_circuit.run(&witness);
-    // dbg!(&run_result);
-
-    debug_eval::<BN254Config, _ModelCircuit<Variable>, _ModelCircuit<BN254>, EmptyHintCaller>(
-        &build_result.model,
-        &build_result.assignment,
-        EmptyHintCaller::new(),
-    );
+    // debug_eval::<BN254Config, _ModelCircuit<Variable>, _ModelCircuit<BN254>, EmptyHintCaller>(
+    //     &build_result.model,
+    //     &build_result.assignment,
+    //     EmptyHintCaller::new(),
+    // );
 }
