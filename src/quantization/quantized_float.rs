@@ -12,7 +12,11 @@ impl QuantizedFloat {
 
     /// Circuit for add two quantized values
     pub(crate) fn add<C: Config, B: RootAPI<C>>(&self, api: &mut B, b: &Self) -> Self {
-        QuantizedFloat(api.add(self.0, b.0))
+        api.display("add_a", self.0);
+        api.display("add_b", b.0);
+        let sum = api.add(self.0, b.0);
+        api.display("sum", sum);
+        QuantizedFloat(sum)
     }
 
     /// Circuit for multiplying two quantized values
@@ -20,12 +24,17 @@ impl QuantizedFloat {
         &self,
         api: &mut B,
         b: &Self,
-        scale_inv: Variable,
+        shift: Variable,
     ) -> Self {
+        api.display("a", self.0);
+        api.display("b", b.0);
         // multiply into accumulator
         let acc_mul = api.mul(self.0, b.0);
+        api.display("acc_mul", acc_mul);
         // rescale
-        let rescaled_mul = api.mul(acc_mul, scale_inv);
+        let rescaled_mul = api.unconstrained_shift_r(acc_mul, shift);
+        api.display("rescaled_mul", rescaled_mul);
+        // let rescaled_mul = api.mul(acc_mul, shift);
         QuantizedFloat(rescaled_mul)
     }
 
@@ -82,7 +91,7 @@ mod tests {
         declare_circuit!(MulCircuit {
             a: Variable,
             b: Variable,
-            scale_inv: PublicVariable,
+            shift: PublicVariable,
             target: PublicVariable
         });
 
@@ -90,7 +99,7 @@ mod tests {
             fn define<Builder: RootAPI<BN254Config>>(&self, api: &mut Builder) {
                 let a = QuantizedFloat(self.a);
                 let b = QuantizedFloat(self.b);
-                let sum = a.mul(api, &b, self.scale_inv);
+                let sum = a.mul(api, &b, self.shift);
                 api.assert_is_equal(sum.0, self.target);
             }
         }
@@ -101,7 +110,7 @@ mod tests {
         let assignment = MulCircuit::<BN254> {
             a: q.quantize(26.5),
             b: q.quantize(-40.25),
-            scale_inv: BN254::from(q.scale()).inv().unwrap(),
+            shift: BN254::from(q.scale()).inv().unwrap(),
             target: q.quantize(-1066.625),
         };
         let witness = compile_result

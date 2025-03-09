@@ -40,6 +40,7 @@ impl<const N: u8> Quantizer<N> {
 #[cfg(test)]
 mod tests {
     use crate::quantization::quantizer::Quantizer;
+    use expander_compiler::field::{FieldArith, BN254};
 
     #[test]
     fn test_i32_as_u32_same_bit_pattern() {
@@ -62,5 +63,47 @@ mod tests {
         let q = Quantizer::<16> {};
         let v = 32767.99884033;
         assert_eq!(q.dequantize(&q.quantize(v)) - v, 0.0);
+    }
+
+    #[test]
+    fn test_linear_regression() {
+        const X_MEAN: f32 = 49.5;
+        const X_STD: f32 = 28.86607004772212;
+        const Y_MEAN: f32 = 145.0;
+        const Y_STD: f32 = 57.73214009544424;
+        fn normalize(x: f32) -> f32 {
+            (x - X_MEAN) / X_STD
+        }
+        fn denormalize(y: f32) -> f32 {
+            y * Y_STD + Y_MEAN
+        }
+
+        let q = Quantizer::<7> {};
+        let x_norm = normalize(90.);
+        // let weight = 0.9948216080665588;
+        // let bias = 0.005930743645876646;
+
+        let weight = 2.1;
+        let bias = 5.1;
+
+        let q_x_norm = q.quantize(x_norm);
+        let q_weight = q.quantize(weight);
+        let q_bias = q.quantize(bias);
+
+        // dbg!(q.dequantize(&q_x_norm));
+        // dbg!(q.dequantize(&q_weight));
+        // dbg!(q.dequantize(&q_bias));
+
+        // let acc_mul = q_x_norm * q_weight;
+        // let rescaled_mul = acc_mul * BN254::from(q.scale()).inv().unwrap();
+        // let result = rescaled_mul + q_bias;
+        //
+        // let y_norm = q.dequantize(&result);
+        // let y = denormalize(y_norm);
+        // dbg!(y);
+
+        let acc_mul = q_weight * q_bias;
+        let rescaled_mul = acc_mul * BN254::from(q.scale()).inv().unwrap();
+        dbg!(q.dequantize(&rescaled_mul));
     }
 }

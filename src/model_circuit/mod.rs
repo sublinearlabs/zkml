@@ -22,14 +22,14 @@ pub struct AssignmentParameters {
     pub inputs: Vec<BN254>,
     pub weights: Vec<BN254>,
     pub outputs: Vec<BN254>,
-    pub scale_inv: BN254,
+    pub shift: BN254,
 }
 
 declare_circuit!(_ModelCircuit {
     input: [Variable],
     output: [Variable],
     weights: [Variable],
-    scale_inv: Variable,
+    shift: Variable,
     ops: [NodeOp],
 });
 
@@ -69,7 +69,7 @@ impl ModelCircuit {
         new_assignment
             .weights
             .resize(params.weights.len(), BN254::default());
-        new_assignment.scale_inv = params.scale_inv;
+        new_assignment.shift = params.shift;
 
         for i in 0..params.weights.len() {
             new_assignment.weights[i] = params.weights[i];
@@ -91,7 +91,7 @@ impl<C: Config> Define<C> for ModelCircuit {
 
         for op in &self.ops {
             let circuit_eval_result =
-                op.create_circuit(api, &history, &self.input, &self.weights, self.scale_inv);
+                op.create_circuit(api, &history, &self.input, &self.weights, self.shift);
             history.insert(op.id(), circuit_eval_result);
         }
 
@@ -158,7 +158,7 @@ mod tests {
             inputs: vec![BN254::from(5_u64)],
             outputs: vec![BN254::from(10_u64)],
             // scale not necessary for this example
-            scale_inv: BN254::one(),
+            shift: BN254::one(),
         };
 
         let compiled_result: CompileResult<BN254Config> = compile(

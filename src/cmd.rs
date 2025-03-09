@@ -39,7 +39,7 @@ pub fn compile_circuit<const N: u8>(
         inputs,
         outputs,
         weights,
-        scale_inv: BN254::from(quantizer.scale()).inv().unwrap(),
+        shift: BN254::from(N as u64),
     };
 
     let assignment = _ModelCircuit::new_assignment(&assignment_parameters);
