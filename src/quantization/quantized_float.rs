@@ -12,11 +12,7 @@ impl QuantizedFloat {
 
     /// Circuit for add two quantized values
     pub(crate) fn add<C: Config, B: RootAPI<C>>(&self, api: &mut B, b: &Self) -> Self {
-        api.display("add_a", self.0);
-        api.display("add_b", b.0);
-        let sum = api.add(self.0, b.0);
-        api.display("sum", sum);
-        QuantizedFloat(sum)
+        QuantizedFloat(api.add(self.0, b.0))
     }
 
     /// Circuit for multiplying two quantized values
@@ -26,15 +22,11 @@ impl QuantizedFloat {
         b: &Self,
         shift: Variable,
     ) -> Self {
-        api.display("a", self.0);
-        api.display("b", b.0);
         // multiply into accumulator
         let acc_mul = api.mul(self.0, b.0);
-        api.display("acc_mul", acc_mul);
         // rescale
+        // TODO: we are cheating here, we need a way to constrain this
         let rescaled_mul = api.unconstrained_shift_r(acc_mul, shift);
-        api.display("rescaled_mul", rescaled_mul);
-        // let rescaled_mul = api.mul(acc_mul, shift);
         QuantizedFloat(rescaled_mul)
     }
 
