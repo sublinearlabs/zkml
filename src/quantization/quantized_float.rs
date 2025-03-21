@@ -94,8 +94,8 @@ mod tests {
             fn define<Builder: RootAPI<BN254Config>>(&self, api: &mut Builder) {
                 let a = QuantizedFloat(self.a);
                 let b = QuantizedFloat(self.b);
-                let sum = a.mul(api, &b, self.shift);
-                api.assert_is_equal(sum.0, self.target);
+                let prod = a.mul(api, &b, self.shift);
+                api.assert_is_equal(prod.0, self.target);
             }
         }
 
@@ -105,7 +105,7 @@ mod tests {
         let assignment = MulCircuit::<BN254> {
             a: q.quantize(26.5),
             b: q.quantize(-40.25),
-            shift: BN254::from(q.scale()).inv().unwrap(),
+            shift: BN254::from(q.scale()),
             target: q.quantize(-1066.625),
         };
         let witness = compile_result
