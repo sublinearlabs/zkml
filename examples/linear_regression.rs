@@ -48,7 +48,7 @@ fn main() {
         .collect_vec();
 
     let build_result = compile_circuit(
-        "../models/linear_regression.onnx".into(),
+        "models/linear_regression.onnx".into(),
         input,
         output,
         &quantizer,

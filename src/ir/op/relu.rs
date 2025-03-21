@@ -1,28 +1,27 @@
 use std::collections::HashMap;
 
 use expander_compiler::{
-    field::{FieldArith, M31},
-    frontend::{Config, RootAPI, Variable},
+    field::BN254,
+    frontend::{Config, Error, RootAPI, Variable},
 };
 
-use crate::tensor::{shape::Shape, tensor::Tensor};
+use crate::{quantization::quantizer::Quantizer, tensor::tensor::Tensor};
 
 // struct Relu {
 //     id: usize,
-//     name: String,
 //     input_id: usize,
 // }
 
 // impl Relu {
-//     fn new(id: usize, name: String, input_id: usize) -> Self {
-//         Self { id, name, input_id }
+//     fn new(id: usize, input_id: usize) -> Self {
+//         Self { id, input_id }
 //     }
 // }
 
 #[derive(Debug, Clone, Default)]
 struct ReluParams {
     input_id: usize,
-    input: Tensor<M31>,
+    input: Tensor<BN254>,
     target_len: usize,
 }
 
@@ -44,42 +43,54 @@ impl ReluParams {
         api: &mut Builder,
         history: &HashMap<usize, Tensor<Variable>>,
         input_id: &usize,
-        weight_value: &Vec<Variable>,
-        lookup_table: &Vec<Variable>,
     ) -> Tensor<Variable> {
-        let mut res_data = vec![];
+        let query = history.get(input_id).unwrap();
 
-        let input_data = history.get(input_id).unwrap();
+        let hint = api.new_hint("relu_hint", &query.data, self.target_len);
 
-        for input in &input_data.data {
-            // let c = api.unconstrained_greater(C::CircuitField::zero(), input);
-            let c = api.unconstrained_greater(C::CircuitField::zero(), input);
-            res_data.push(c);
-        }
-
-        Tensor::new(Some(res_data), input_data.shape.clone())
+        Tensor::new(Some(hint), query.shape.clone())
     }
+}
+
+pub fn relu_hint(input: &[BN254], output: &mut [BN254]) -> Result<(), Error> {
+    // TODO: look for a way of getting the quantizer in the hint
+    let quantizer = Quantizer::<16> {};
+
+    for i in 0..input.len() {
+        let input = quantizer.dequantize(&input[i]);
+        let zero = quantizer.dequantize(&BN254::zero());
+
+        if input < zero {
+            output[i] = BN254::zero();
+        } else {
+            output[i] = quantizer.quantize(input);
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::ops::Neg;
 
     use crate::{
-        ir::op::relu::ReluParams,
+        ir::op::relu::{relu_hint, ReluParams},
+        quantization::quantizer::Quantizer,
         tensor::{shape::Shape, tensor::Tensor},
     };
     use expander_compiler::{
-        builder::basic::Builder,
         compile::CompileOptions,
         declare_circuit,
-        field::{FieldArith, FieldModulus, M31},
-        frontend::{compile, BasicAPI, Config, Define, M31Config, RootAPI, Variable},
+        field::BN254,
+        frontend::{compile, BN254Config, Define, HintRegistry, RootAPI, Variable},
     };
 
     #[test]
     fn test_relu() {
+        let mut hint_registery = HintRegistry::<BN254>::new();
+        hint_registery.register("relu_hint", relu_hint);
+
         declare_circuit!(ReluCircuit {
             input: [Variable],
             target: [Variable],
@@ -102,8 +113,8 @@ mod tests {
             }
         }
 
-        impl Define<M31Config> for ReluCircuit<Variable> {
-            fn define<Builder: RootAPI<M31Config>>(&self, api: &mut Builder) {
+        impl Define<BN254Config> for ReluCircuit<Variable> {
+            fn define<Builder: RootAPI<BN254Config>>(&self, api: &mut Builder) {
                 let mut history = HashMap::new();
 
                 let input_id = self.params.input_id;
@@ -113,9 +124,7 @@ mod tests {
 
                 history.insert(input_id, input_data);
 
-                let res = self
-                    .params
-                    .create_circuit(api, &history, &input_id, &vec![], &vec![]);
+                let res = self.params.create_circuit(api, &history, &input_id);
 
                 for i in 0..res.data.len() {
                     api.assert_is_equal(res.data[i], self.target[i]);
@@ -123,30 +132,19 @@ mod tests {
             }
         }
 
-        // let input: Tensor<M31> = Tensor::new(Some(vec![M31::from(9)]), Shape::new(vec![1]));
-        // let target: Vec<M31> = vec![M31::from(10)];
-        // let input: Tensor<M31> = Tensor::new(Some(vec![M31::from(3),M31::from(5),M31::from(1).neg(),M31::zero()]), Shape::new(vec![1, 4]));
+        let quantizer = Quantizer::<16> {};
 
-        let input = Tensor::new(
-            Some(vec![
-                M31::from(2),
-                M31::from(0),
-                M31::from(1).neg(),
-                M31::from(5).neg(),
-                M31::from(7),
-                M31::from(2).neg(),
-            ]),
-            Shape::new(vec![1, 6]),
-        );
+        let input_data = vec![2., 0., -1., -5., 7., -2.]
+            .into_iter()
+            .map(|val| Quantizer::quantize(&quantizer, val))
+            .collect();
 
-        let target: Vec<M31> = vec![
-            M31::from(2),
-            M31::zero(),
-            M31::zero(),
-            M31::zero(),
-            M31::from(7),
-            M31::zero(),
-        ];
+        let input = Tensor::new(Some(input_data), Shape::new(vec![1, 6]));
+
+        let target: Vec<BN254> = vec![2., 0., 0., 0., 7., 0.]
+            .into_iter()
+            .map(|val| Quantizer::quantize(&quantizer, val))
+            .collect();
 
         let params = ReluParams {
             input: input.clone(),
@@ -154,7 +152,7 @@ mod tests {
             input_id: 0,
         };
 
-        let compiled_circuit: expander_compiler::frontend::CompileResult<M31Config> =
+        let compiled_circuit: expander_compiler::frontend::CompileResult<BN254Config> =
             compile(&ReluCircuit::new(params.clone()), CompileOptions::default()).unwrap();
 
         let assignment = ReluCircuit {
@@ -165,7 +163,7 @@ mod tests {
 
         let witness = compiled_circuit
             .witness_solver
-            .solve_witness(&assignment)
+            .solve_witness_with_hints(&assignment, &mut hint_registery)
             .unwrap();
 
         let output = compiled_circuit.layered_circuit.run(&witness);

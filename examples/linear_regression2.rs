@@ -43,7 +43,7 @@ fn main() {
     dbg!(&result);
 
     let build_result = compile_circuit(
-        "../models/linear_regression2.onnx".into(),
+        "models/linear_regression2.onnx".into(),
         input,
         output,
         &quantizer,

@@ -6,7 +6,7 @@ from sklearn.metrics import mean_squared_error
 from skl2onnx import to_onnx
 
 # Load the Boston Housing dataset
-boston = datasets.fetch_california_housing()
+boston = datasets.get_data_home()
 X = boston.data
 y = boston.target
 
