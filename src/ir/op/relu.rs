@@ -5,50 +5,62 @@ use expander_compiler::{
     frontend::{Config, Error, RootAPI, Variable},
 };
 
-use crate::{quantization::quantizer::Quantizer, tensor::tensor::Tensor};
+use crate::{
+    quantization::{quantized_float::QuantizedFloat, quantizer::Quantizer},
+    tensor::{shape::Shape, tensor::Tensor},
+};
 
-// struct Relu {
-//     id: usize,
-//     input_id: usize,
-// }
+#[derive(Debug, Clone)]
+pub(crate) struct ReluOp {
+    pub(crate) id: usize,
+    pub(crate) input_id: usize,
+}
 
-// impl Relu {
-//     fn new(id: usize, input_id: usize) -> Self {
-//         Self { id, input_id }
-//     }
-// }
+impl ReluOp {
+    fn new(id: usize, input_id: usize) -> Self {
+        Self { id, input_id }
+    }
+
+    pub(crate) fn create_circuit<C: Config, Builder: RootAPI<C>>(
+        &self,
+        api: &mut Builder,
+        history: &HashMap<usize, Tensor<QuantizedFloat>>,
+    ) -> Tensor<QuantizedFloat> {
+        let input = history.get(&self.input_id).unwrap();
+
+        let params = ReluParams::new(input.data.len(), input.shape.clone(), input.data.len());
+
+        params.create_circuit(api, input.clone())
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 struct ReluParams {
-    input_id: usize,
-    input: Tensor<BN254>,
+    input_len: usize,
+    input_shape: Shape,
     target_len: usize,
 }
 
 impl ReluParams {
-    fn compute<T: Default + Clone + PartialOrd>(&self, input: Tensor<T>) -> Tensor<T> {
-        let mut res = vec![];
-        for val in input.data {
-            if val < T::default() {
-                res.push(T::default());
-            } else {
-                res.push(val);
-            }
+    fn new(input_len: usize, input_shape: Shape, target_len: usize) -> Self {
+        Self {
+            input_len,
+            input_shape,
+            target_len,
         }
-        Tensor::new(Some(res), input.shape)
     }
-
     fn create_circuit<C: Config, Builder: RootAPI<C>>(
         &self,
         api: &mut Builder,
-        history: &HashMap<usize, Tensor<Variable>>,
-        input_id: &usize,
-    ) -> Tensor<Variable> {
-        let query = history.get(input_id).unwrap();
+        input: Tensor<QuantizedFloat>,
+    ) -> Tensor<QuantizedFloat> {
+        let query: Vec<Variable> = input.data.iter().map(|val| val.to_var()).collect();
 
-        let hint = api.new_hint("relu_hint", &query.data, self.target_len);
+        let hint = api.new_hint("relu_hint", &query, self.target_len);
 
-        Tensor::new(Some(hint), query.shape.clone())
+        let res = hint.iter().map(|val| QuantizedFloat::new(*val)).collect();
+
+        Tensor::new(Some(res), input.shape.clone())
     }
 }
 
@@ -72,11 +84,9 @@ pub fn relu_hint(input: &[BN254], output: &mut [BN254]) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
     use crate::{
         ir::op::relu::{relu_hint, ReluParams},
-        quantization::quantizer::Quantizer,
+        quantization::{quantized_float::QuantizedFloat, quantizer::Quantizer},
         tensor::{shape::Shape, tensor::Tensor},
     };
     use expander_compiler::{
@@ -104,9 +114,7 @@ mod tests {
                 circuit
                     .target
                     .resize(params.target_len, Variable::default());
-                circuit
-                    .input
-                    .resize(params.input.data.len(), Variable::default());
+                circuit.input.resize(params.input_len, Variable::default());
 
                 circuit.params = params;
                 circuit
@@ -115,19 +123,19 @@ mod tests {
 
         impl Define<BN254Config> for ReluCircuit<Variable> {
             fn define<Builder: RootAPI<BN254Config>>(&self, api: &mut Builder) {
-                let mut history = HashMap::new();
+                let input = self
+                    .input
+                    .iter()
+                    .map(|val| QuantizedFloat::new(*val))
+                    .collect();
 
-                let input_id = self.params.input_id;
-
-                let input_data =
-                    Tensor::new(Some(self.input.clone()), self.params.input.shape.clone());
-
-                history.insert(input_id, input_data);
-
-                let res = self.params.create_circuit(api, &history, &input_id);
+                let res = self.params.create_circuit(
+                    api,
+                    Tensor::new(Some(input), self.params.input_shape.clone()),
+                );
 
                 for i in 0..res.data.len() {
-                    api.assert_is_equal(res.data[i], self.target[i]);
+                    api.assert_is_equal(res.data[i].to_var(), self.target[i]);
                 }
             }
         }
@@ -147,9 +155,9 @@ mod tests {
             .collect();
 
         let params = ReluParams {
-            input: input.clone(),
+            input_len: input.data.len(),
+            input_shape: input.shape,
             target_len: target.len(),
-            input_id: 0,
         };
 
         let compiled_circuit: expander_compiler::frontend::CompileResult<BN254Config> =
@@ -167,6 +175,8 @@ mod tests {
             .unwrap();
 
         let output = compiled_circuit.layered_circuit.run(&witness);
+
+        output.iter().for_each(|val| assert!(val));
 
         dbg!(&output);
     }
