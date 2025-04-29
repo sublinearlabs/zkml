@@ -5,7 +5,11 @@ use tract_core::internal::tract_itertools::Itertools;
 use tract_core::ops::{einsum::EinSum, konst::Const};
 
 use crate::ir::op::add::AddOp;
+use crate::ir::op::conv::ConvOp;
 use crate::ir::op::einsum::EinsumOp;
+use crate::ir::op::max::MaxOp;
+use crate::ir::op::maxpool::MaxPoolOp;
+use crate::ir::op::reshape::ReshapeOp;
 use crate::ir::op::tensor_view::{TensorViewOp, ViewType};
 use crate::ir::op::NodeOp;
 use crate::ir::IR;
@@ -46,6 +50,10 @@ pub(crate) fn model_graph_to_ir(model_graph: &Graph<TypedFact, Box<dyn TypedOp>>
             "Const" => parse_const(node, &mut constants),
             "EinSum" => parse_einsum(node),
             "Add" => parse_add(node),
+            "Conv" => parse_conv(node),
+            "Max" => parse_max(node),
+            "MaxPool" => parse_max_pool(node),
+            "Reshape" => parse_reshape(node),
             unknown_op => panic!("unsupported node: {}", unknown_op),
         };
         ops.push(op);
@@ -133,6 +141,25 @@ fn parse_add<F: Fact, O: Debug>(node: &Node<F, O>) -> NodeOp {
     })
 }
 
+fn parse_conv<F: Fact, O: Debug>(node: &Node<F, O>) -> NodeOp {
+    let input_ids = input_ids(node);
+    NodeOp::Conv(ConvOp { id: node.id })
+}
+
+fn parse_max<F: Fact, O: Debug>(node: &Node<F, O>) -> NodeOp {
+    let input_ids = input_ids(node);
+    NodeOp::Max(MaxOp { id: node.id })
+}
+
+fn parse_max_pool<F: Fact, O: Debug>(node: &Node<F, O>) -> NodeOp {
+    let input_ids = input_ids(node);
+    NodeOp::MaxPool(MaxPoolOp { id: node.id })
+}
+
+fn parse_reshape<F: Fact, O: Debug>(node: &Node<F, O>) -> NodeOp {
+    let input_ids = input_ids(node);
+    NodeOp::Reshape(ReshapeOp { id: node.id })
+}
 fn tract_shape_data<F: Fact, O: Debug>(node: &Node<F, O>) -> Shape {
     assert_eq!(node.outputs.len(), 1);
     let shape_data = &node.outputs[0]
@@ -162,7 +189,8 @@ mod tests {
     use super::{load_onnx, model_graph_to_ir};
     #[test]
     fn test_load_onnx() {
-        let model_graph = load_onnx("models/linear_regression.onnx".into());
+        // let model_graph = load_onnx("models/linear_regression.onnx".into());
+        let model_graph = load_onnx("models/mnist-12.onnx".into());
         let ir = model_graph_to_ir(&model_graph);
     }
 }
